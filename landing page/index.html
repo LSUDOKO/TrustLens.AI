@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BusinessAdvisor - Premium Business Solutions</title>
+    <title>TrustLens.AI - On-Chain Wallet Trust & Risk Analysis</title>
     <style>
         * {
             margin: 0;
@@ -20,6 +20,7 @@
             --text-secondary: rgba(255, 255, 255, 0.7);
             --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
             --accent-gradient: linear-gradient(135deg, #4a4a4a 0%, #6a6a6a 100%);
+            --button-text: #000000;
         }
 
         [data-theme="light"] {
@@ -31,6 +32,7 @@
             --text-secondary: rgba(0, 0, 0, 0.7);
             --shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
             --accent-gradient: linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%);
+            --button-text: #ffffff;
         }
 
         body {
@@ -149,13 +151,15 @@
         }
 
         .nav-link {
-            color: var(--text-secondary);
+            color: #ffffff !important;
             text-decoration: none;
             padding: 0.5rem 1rem;
-            border-radius: 50px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            display: inline-block;
         }
 
         .nav-link::before {
@@ -165,15 +169,18 @@
             left: -100%;
             width: 100%;
             height: 100%;
-            background: var(--secondary-gradient);
+            background: rgba(255, 255, 255, 0.2);
             transition: left 0.3s ease;
             z-index: -1;
-            border-radius: 50px;
+            border-radius: 25px;
         }
 
         .nav-link:hover {
-            color: var(--text-primary);
+            color: #ffffff !important;
             transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
         }
 
         .nav-link:hover::before {
@@ -246,7 +253,7 @@
             gap: 0.5rem;
             padding: 1rem 2rem;
             background: var(--secondary-gradient);
-            color: white;
+            color: var(--button-text);
             text-decoration: none;
             border-radius: 50px;
             font-weight: 600;
@@ -474,11 +481,11 @@
     <header id="header">
         <div class="container">
             <nav>
-                <div class="logo">BusinessAdvisor</div>
+                <div class="logo">🔍 TrustLens.AI</div>
                 <ul class="nav-links">
                     <li><a href="#home" class="nav-link">Home</a></li>
-                    <li><a href="#services" class="nav-link">Services</a></li>
-                    <li><a href="#check" class="nav-link">Check Tab</a></li>
+                    <li><a href="#features" class="nav-link">Features</a></li>
+                    <li><a href="#demo" class="nav-link">Try Demo</a></li>
                     <li><a href="#about" class="nav-link">About</a></li>
                 </ul>
                 <button class="theme-toggle" id="themeToggle">
@@ -499,13 +506,13 @@
         <div class="container">
             <section class="hero">
                 <div class="hero-content">
-                    <h1 class="hero-title">The best advice for your business</h1>
+                    <h1 class="hero-title">Analyze On-Chain Wallet Trust & Risk</h1>
                     <p class="hero-subtitle">
-                        Transform your business with cutting-edge strategies and premium consulting services. 
-                        We deliver exceptional results that drive growth and success.
+                        Advanced blockchain analytics powered by AI. Get comprehensive trust scores, 
+                        risk assessments, and detailed insights for any wallet address across multiple chains.
                     </p>
-                    <a href="#services" class="cta-button">
-                        Get Started
+                    <a href="#demo" class="cta-button">
+                        Try Analysis
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M13.75 12l-7.25-7.25 1.415-1.415L16.58 12l-8.665 8.665L6.5 19.25 13.75 12z"/>
                         </svg>
@@ -513,23 +520,23 @@
                 </div>
                 <div class="hero-visual">
                     <div class="glass-card">
-                        <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Premium Features</h3>
+                        <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Core Features</h3>
                         <ul class="feature-list">
                             <li class="feature-item">
                                 <div class="feature-icon"></div>
-                                <span>Strategic Business Planning</span>
+                                <span>Real-time Wallet Analysis</span>
                             </li>
                             <li class="feature-item">
                                 <div class="feature-icon"></div>
-                                <span>Market Analysis & Research</span>
+                                <span>AI-Powered Risk Scoring</span>
                             </li>
                             <li class="feature-item">
                                 <div class="feature-icon"></div>
-                                <span>Financial Optimization</span>
+                                <span>Multi-Chain Support</span>
                             </li>
                             <li class="feature-item">
                                 <div class="feature-icon"></div>
-                                <span>Growth Acceleration</span>
+                                <span>Comprehensive Reports</span>
                             </li>
                         </ul>
                     </div>
@@ -538,21 +545,44 @@
         </div>
     </main>
 
-    <section id="about" class="about-section">
+    <section id="features" class="about-section">
         <div class="container">
-            <h2 class="section-title">Why Choose Us</h2>
+            <h2 class="section-title">Why Choose TrustLens.AI</h2>
             <div class="about-grid">
                 <div class="about-card">
-                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Expert Guidance</h3>
-                    <p style="color: var(--text-secondary);">Our team of seasoned professionals brings decades of experience to help your business thrive in today's competitive landscape.</p>
+                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Multi-Chain Analysis</h3>
+                    <p style="color: var(--text-secondary);">Analyze wallets across Ethereum, Metis, and other major blockchains with comprehensive on-chain data aggregation and real-time insights.</p>
                 </div>
                 <div class="about-card">
-                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Proven Results</h3>
-                    <p style="color: var(--text-secondary);">We've helped thousands of businesses achieve their goals with our data-driven strategies and innovative solutions.</p>
+                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">AI-Powered Insights</h3>
+                    <p style="color: var(--text-secondary);">Advanced machine learning algorithms provide natural language explanations and risk assessments based on transaction patterns and behavior analysis.</p>
                 </div>
                 <div class="about-card">
-                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">24/7 Support</h3>
-                    <p style="color: var(--text-secondary);">Round-the-clock assistance ensures you never face challenges alone. We're here whenever you need us.</p>
+                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Real-Time Processing</h3>
+                    <p style="color: var(--text-secondary);">Get instant trust scores and risk analysis with our high-performance backend powered by FastAPI and Redis caching for lightning-fast results.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="demo" class="about-section" style="background: var(--glass-bg); backdrop-filter: blur(20px);">
+        <div class="container">
+            <h2 class="section-title">Try TrustLens.AI Demo</h2>
+            <div style="text-align: center; max-width: 600px; margin: 0 auto;">
+                <p style="color: var(--text-secondary); margin-bottom: 2rem; font-size: 1.1rem;">
+                    Experience the power of on-chain wallet analysis. Enter any wallet address to get instant trust scores, risk assessments, and AI-powered insights.
+                </p>
+                <a href="http://localhost:5173" class="cta-button" style="font-size: 1.1rem; padding: 1.2rem 2.5rem;">
+                     Launch Web App
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M13.75 12l-7.25-7.25 1.415-1.415L16.58 12l-8.665 8.665L6.5 19.25 13.75 12z"/>
+                    </svg>
+                </a>
+                <div style="margin-top: 2rem; padding: 1.5rem; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 15px;">
+                    <h4 style="color: var(--text-primary); margin-bottom: 1rem;">🏆 Built for HyperHack 2025</h4>
+                    <p style="color: var(--text-secondary); font-size: 0.95rem;">
+                        TrustLens.AI is a cutting-edge blockchain analytics platform designed to provide comprehensive wallet trust analysis and risk assessment for the decentralized ecosystem.
+                    </p>
                 </div>
             </div>
         </div>
@@ -560,7 +590,7 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 BusinessAdvisor. All rights reserved. | Crafted with excellence</p>
+            <p>&copy; 2025 TrustLens.AI. All rights reserved.</p>
         </div>
     </footer>
 
@@ -677,4 +707,5 @@
         });
     </script>
 </body>
+</html>
 </html>
