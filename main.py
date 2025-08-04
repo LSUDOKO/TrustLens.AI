@@ -1,55 +1,82 @@
-import discord
-from discord.ext import commands
 import os
-import asyncio
-from dotenv import load_dotenv
 import logging
+import aiohttp
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from cogs.risk_analysis.risk_orchestrator import RiskOrchestrator
+from database.redis_manager import RedisManager
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
-# Define intents
-intents = discord.Intents.default()
-intents.message_content = True
-intents.members = True
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-class RiskRaiderBot(commands.Bot):
-    def __init__(self):
-        super().__init__(command_prefix="!", intents=intents)
+# App state to hold singletons
+app_state = {}
 
-    async def setup_hook(self):
-        """Load cogs and sync slash commands."""
-        cogs_to_load = ['cogs.nft_check']
-        for cog in cogs_to_load:
-            try:
-                await self.load_extension(cog)
-                logger.info(f"Successfully loaded cog: {cog}")
-            except Exception as e:
-                logger.error(f"Failed to load cog {cog}: {e}", exc_info=True)
-        
-        # Sync slash commands
-        try:
-            synced = await self.tree.sync()
-            logger.info(f"Synced {len(synced)} slash commands.")
-        except Exception as e:
-            logger.error(f"Failed to sync slash commands: {e}")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Initialize and store clients
+    logger.info("Application startup: Initializing clients...")
+    app_state['http_session'] = aiohttp.ClientSession()
+    app_state['redis_manager'] = RedisManager(
+        host=os.getenv("REDIS_HOST", "localhost"),
+        port=int(os.getenv("REDIS_PORT", 6379))
+    )
+    api_keys = {
+        "BITSCRUNCH_API_KEY": os.getenv("BITSCRUNCH_API_KEY"),
+        "BITQUERY_API_KEY": os.getenv("BITQUERY_API_KEY"),
+    }
+    app_state['risk_orchestrator'] = RiskOrchestrator(
+        api_keys=api_keys,
+        session=app_state['http_session'],
+        redis_manager=app_state['redis_manager']
+    )
+    logger.info("Clients initialized successfully.")
+    yield
+    # Shutdown: Clean up resources
+    logger.info("Application shutdown: Closing clients...")
+    await app_state['http_session'].close()
+    await app_state['redis_manager'].close()
+    logger.info("Clients closed successfully.")
 
-    async def on_ready(self):
-        logger.info(f'Logged in as {self.user} (ID: {self.user.id})')
-        logger.info('------')
+app = FastAPI(lifespan=lifespan, title="TrustLens.AI API", version="1.0")
 
-async def main():
-    bot = RiskRaiderBot()
-    token = os.getenv("DISCORD_BOT_TOKEN")
-    if not token:
-        logger.critical("DISCORD_BOT_TOKEN not found in environment variables!")
-        return
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins for now, restrict in production
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
-    await bot.start(token)
+# Dependency to get the risk orchestrator
+def get_orchestrator():
+    return app_state['risk_orchestrator']
 
-if __name__ == "__main__":
-    asyncio.run(main())
+@app.post("/api/score")
+async def get_score(address: str, orchestrator: RiskOrchestrator = Depends(get_orchestrator)):
+    """Analyzes a wallet address and returns a comprehensive risk score."""
+    if not address:
+        raise HTTPException(status_code=400, detail="Wallet address is required.")
+    
+    try:
+        logger.info(f"Analyzing address: {address}")
+        analysis_result = await orchestrator.analyze_all(wallet_address=address)
+        return analysis_result
+    except Exception as e:
+        logger.error(f"An error occurred during analysis for {address}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="An internal error occurred during analysis.")
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the TrustLens.AI API. Use the /api/score endpoint to analyze a wallet."}
+
+# To run this application:
+# uvicorn main:app --reload
