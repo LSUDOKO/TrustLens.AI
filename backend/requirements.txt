@@ -1,0 +1,26 @@
+# Core FastAPI dependencies
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.4.0
+python-dotenv>=1.0.0
+
+# HTTP client for API calls
+requests>=2.31.0
+aiohttp>=3.9.0
+
+# Caching and performance
+redis>=5.0.0
+
+# Rate limiting and monitoring
+slowapi>=0.1.9
+prometheus-fastapi-instrumentator>=6.1.0
+
+# Logging
+structlog>=23.2.0
+
+# Blockchain integration (for future use)
+web3>=6.0.0
+
+# Data processing
+numpy>=1.24.0
+pandas>=2.0.0

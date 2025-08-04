@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BusinessAdvisor - Premium Business Solutions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #000000 100%);
+            --secondary-gradient: linear-gradient(135deg, #ffffff 0%, #f5f5f5 50%, #e0e0e0 100%);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            --accent-gradient: linear-gradient(135deg, #4a4a4a 0%, #6a6a6a 100%);
+        }
+
+        [data-theme="light"] {
+            --primary-gradient: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%);
+            --secondary-gradient: linear-gradient(135deg, #000000 0%, #2d2d2d 50%, #4a4a4a 100%);
+            --glass-bg: rgba(0, 0, 0, 0.08);
+            --glass-border: rgba(0, 0, 0, 0.15);
+            --text-primary: #000000;
+            --text-secondary: rgba(0, 0, 0, 0.7);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            --accent-gradient: linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--primary-gradient);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .background-shapes {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+            background: var(--secondary-gradient);
+            animation: float 20s infinite ease-in-out;
+            opacity: 0.1;
+        }
+
+        .shape:nth-child(1) {
+            width: 300px;
+            height: 300px;
+            top: -150px;
+            right: -150px;
+            animation-delay: -2s;
+        }
+
+        .shape:nth-child(2) {
+            width: 200px;
+            height: 200px;
+            bottom: -100px;
+            left: -100px;
+            animation-delay: -5s;
+        }
+
+        .shape:nth-child(3) {
+            width: 150px;
+            height: 150px;
+            top: 50%;
+            left: 10%;
+            animation-delay: -8s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-30px) rotate(120deg); }
+            66% { transform: translateY(15px) rotate(240deg); }
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header Styles */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 0;
+            transition: all 0.3s ease;
+        }
+
+        .header-scrolled {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--secondary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-link::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: var(--secondary-gradient);
+            transition: left 0.3s ease;
+            z-index: -1;
+            border-radius: 50px;
+        }
+
+        .nav-link:hover {
+            color: var(--text-primary);
+            transform: translateY(-2px);
+        }
+
+        .nav-link:hover::before {
+            left: 0;
+        }
+
+        .theme-toggle {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: var(--shadow);
+        }
+
+        .theme-icon {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        /* Main Content */
+        main {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding-top: 80px;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        .hero-content {
+            animation: slideInLeft 1s ease-out;
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: var(--secondary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .cta-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            background: var(--secondary-gradient);
+            color: white;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .cta-button:hover::before {
+            left: 100%;
+        }
+
+        .hero-visual {
+            position: relative;
+            animation: slideInRight 1s ease-out;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--secondary-gradient);
+            opacity: 0.5;
+        }
+
+        .glass-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .feature-list {
+            list-style: none;
+            margin-top: 1rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            opacity: 0;
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+
+        .feature-item:nth-child(1) { animation-delay: 0.2s; }
+        .feature-item:nth-child(2) { animation-delay: 0.4s; }
+        .feature-item:nth-child(3) { animation-delay: 0.6s; }
+        .feature-item:nth-child(4) { animation-delay: 0.8s; }
+
+        .feature-icon {
+            width: 16px;
+            height: 16px;
+            background: var(--secondary-gradient);
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        /* About Section */
+        .about-section {
+            padding: 5rem 0;
+            text-align: center;
+        }
+
+        .section-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            background: var(--secondary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .about-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .about-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: left;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .about-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Animations */
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 2rem;
+            }
+
+            .hero-title {
+                font-size: 2.5rem;
+            }
+
+            .container {
+                padding: 0 1rem;
+            }
+        }
+
+        /* Mobile Menu */
+        .mobile-menu {
+            display: none;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 0.5rem;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-menu {
+                display: block;
+            }
+        }
+
+        .menu-icon {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-primary);
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--glass-border);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-shapes">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+
+    <header id="header">
+        <div class="container">
+            <nav>
+                <div class="logo">BusinessAdvisor</div>
+                <ul class="nav-links">
+                    <li><a href="#home" class="nav-link">Home</a></li>
+                    <li><a href="#services" class="nav-link">Services</a></li>
+                    <li><a href="#check" class="nav-link">Check Tab</a></li>
+                    <li><a href="#about" class="nav-link">About</a></li>
+                </ul>
+                <button class="theme-toggle" id="themeToggle">
+                    <svg class="theme-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                </button>
+                <div class="mobile-menu">
+                    <svg class="menu-icon" viewBox="0 0 24 24">
+                        <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main id="home">
+        <div class="container">
+            <section class="hero">
+                <div class="hero-content">
+                    <h1 class="hero-title">The best advice for your business</h1>
+                    <p class="hero-subtitle">
+                        Transform your business with cutting-edge strategies and premium consulting services. 
+                        We deliver exceptional results that drive growth and success.
+                    </p>
+                    <a href="#services" class="cta-button">
+                        Get Started
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M13.75 12l-7.25-7.25 1.415-1.415L16.58 12l-8.665 8.665L6.5 19.25 13.75 12z"/>
+                        </svg>
+                    </a>
+                </div>
+                <div class="hero-visual">
+                    <div class="glass-card">
+                        <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Premium Features</h3>
+                        <ul class="feature-list">
+                            <li class="feature-item">
+                                <div class="feature-icon"></div>
+                                <span>Strategic Business Planning</span>
+                            </li>
+                            <li class="feature-item">
+                                <div class="feature-icon"></div>
+                                <span>Market Analysis & Research</span>
+                            </li>
+                            <li class="feature-item">
+                                <div class="feature-icon"></div>
+                                <span>Financial Optimization</span>
+                            </li>
+                            <li class="feature-item">
+                                <div class="feature-icon"></div>
+                                <span>Growth Acceleration</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <section id="about" class="about-section">
+        <div class="container">
+            <h2 class="section-title">Why Choose Us</h2>
+            <div class="about-grid">
+                <div class="about-card">
+                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Expert Guidance</h3>
+                    <p style="color: var(--text-secondary);">Our team of seasoned professionals brings decades of experience to help your business thrive in today's competitive landscape.</p>
+                </div>
+                <div class="about-card">
+                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Proven Results</h3>
+                    <p style="color: var(--text-secondary);">We've helped thousands of businesses achieve their goals with our data-driven strategies and innovative solutions.</p>
+                </div>
+                <div class="about-card">
+                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">24/7 Support</h3>
+                    <p style="color: var(--text-secondary);">Round-the-clock assistance ensures you never face challenges alone. We're here whenever you need us.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 BusinessAdvisor. All rights reserved. | Crafted with excellence</p>
+        </div>
+    </footer>
+
+    <script>
+        // Theme Toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+
+        themeToggle.addEventListener('click', () => {
+            body.dataset.theme = body.dataset.theme === 'light' ? '' : 'light';
+            
+            // Smooth transition effect
+            themeToggle.style.transform = 'rotate(360deg)';
+            setTimeout(() => {
+                themeToggle.style.transform = '';
+            }, 300);
+        });
+
+        // Header scroll effect
+        const header = document.getElementById('header');
+        
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 50) {
+                header.classList.add('header-scrolled');
+            } else {
+                header.classList.remove('header-scrolled');
+            }
+        });
+
+        // Smooth scrolling for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animationPlayState = 'running';
+                }
+            });
+        }, observerOptions);
+
+        // Observe all animated elements
+        document.querySelectorAll('.about-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        // Add hover effects for cards
+        document.querySelectorAll('.glass-card, .about-card').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-10px) scale(1.02)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = '';
+            });
+        });
+
+        // Particle effect on cursor (optional enhancement)
+        document.addEventListener('mousemove', (e) => {
+            const cursor = document.createElement('div');
+            cursor.style.cssText = `
+                position: fixed;
+                width: 4px;
+                height: 4px;
+                background: var(--secondary-gradient);
+                border-radius: 50%;
+                pointer-events: none;
+                left: ${e.clientX - 2}px;
+                top: ${e.clientY - 2}px;
+                opacity: 0.8;
+                animation: fadeOut 0.5s ease-out forwards;
+                z-index: 9999;
+            `;
+            document.body.appendChild(cursor);
+            
+            setTimeout(() => cursor.remove(), 500);
+        });
+
+        // Add fadeOut animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeOut {
+                to {
+                    opacity: 0;
+                    transform: scale(0);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Loading animation
+        window.addEventListener('load', () => {
+            document.body.style.opacity = '0';
+            document.body.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => {
+                document.body.style.opacity = '1';
+            }, 100);
+        });
+    </script>
+</body>
+</html>
