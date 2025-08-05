@@ -1,0 +1,817 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About - TrustLens.AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --primary-bg: #000000;
+        --secondary-bg: #111111;
+        --card-bg: #1a1a1a;
+        --text-primary: #ffffff;
+        --text-secondary: #a0a0a0;
+        --accent: #00ff88;
+        --accent-hover: #00cc6a;
+        --border: #333333;
+        --shadow: rgba(0, 255, 136, 0.1);
+        --gradient-1: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+        --gradient-2: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+      }
+
+      [data-theme="light"] {
+        --primary-bg: #ffffff;
+        --secondary-bg: #f8f9fa;
+        --card-bg: #ffffff;
+        --text-primary: #000000;
+        --text-secondary: #666666;
+        --accent: #00aa55;
+        --accent-hover: #008844;
+        --border: #e0e0e0;
+        --shadow: rgba(0, 170, 85, 0.1);
+        --gradient-1: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+        --gradient-2: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--primary-bg);
+        color: var(--text-primary);
+        line-height: 1.6;
+        overflow-x: hidden;
+      }
+
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 2rem;
+      }
+
+      /* Background Effects */
+      .background-shapes {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        z-index: -1;
+        pointer-events: none;
+      }
+
+      .shape {
+        position: absolute;
+        border-radius: 50%;
+        background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+        opacity: 0.05;
+        animation: float 20s infinite ease-in-out;
+      }
+
+      .shape:nth-child(1) {
+        width: 300px;
+        height: 300px;
+        top: 10%;
+        left: -10%;
+        animation-delay: 0s;
+      }
+
+      .shape:nth-child(2) {
+        width: 200px;
+        height: 200px;
+        top: 60%;
+        right: -5%;
+        animation-delay: -7s;
+      }
+
+      .shape:nth-child(3) {
+        width: 400px;
+        height: 400px;
+        bottom: -20%;
+        left: 50%;
+        animation-delay: -14s;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        33% { transform: translateY(-30px) rotate(120deg); }
+        66% { transform: translateY(30px) rotate(240deg); }
+      }
+
+      /* Header */
+      header {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--border);
+        z-index: 1000;
+        transition: all 0.3s ease;
+      }
+
+      [data-theme="light"] header {
+        background: rgba(255, 255, 255, 0.9);
+      }
+
+      nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 0;
+      }
+
+      .logo {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        text-decoration: none;
+        background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .nav-links {
+        display: flex;
+        gap: 2rem;
+        align-items: center;
+      }
+
+      .nav-link {
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.3s ease;
+        position: relative;
+      }
+
+      .nav-link:hover {
+        color: var(--accent);
+      }
+
+      .nav-link::after {
+        content: '';
+        position: absolute;
+        bottom: -5px;
+        left: 0;
+        width: 0;
+        height: 2px;
+        background: var(--accent);
+        transition: width 0.3s ease;
+      }
+
+      .nav-link:hover::after {
+        width: 100%;
+      }
+
+      .theme-toggle {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 8px;
+        transition: background 0.3s ease;
+      }
+
+      .theme-toggle:hover {
+        background: var(--card-bg);
+      }
+
+      .theme-icon {
+        width: 20px;
+        height: 20px;
+        color: var(--text-secondary);
+        transition: color 0.3s ease;
+      }
+
+      .theme-toggle:hover .theme-icon {
+        color: var(--accent);
+      }
+
+      [data-theme="light"] .moon-icon {
+        display: none;
+      }
+
+      [data-theme="dark"] .sun-icon {
+        display: none;
+      }
+
+      .mobile-menu-button {
+        display: none;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 0.5rem;
+      }
+
+      .menu-icon {
+        width: 24px;
+        height: 24px;
+        color: var(--text-primary);
+      }
+
+      /* Main Content */
+      main {
+        padding-top: 120px;
+        min-height: 100vh;
+      }
+
+      .hero-section {
+        text-align: center;
+        padding: 4rem 0;
+        position: relative;
+      }
+
+      .hero-title {
+        font-size: 3.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        line-height: 1.2;
+      }
+
+      .hero-subtitle {
+        font-size: 1.25rem;
+        color: var(--text-secondary);
+        max-width: 600px;
+        margin: 0 auto 3rem;
+        font-weight: 400;
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 2rem;
+        margin-bottom: 4rem;
+      }
+
+      .stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+      }
+
+      .stat-card:hover::before {
+        transform: scaleX(1);
+      }
+
+      .stat-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 40px var(--shadow);
+        border-color: var(--accent);
+      }
+
+      .stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--accent);
+        display: block;
+        margin-bottom: 0.5rem;
+      }
+
+      .stat-label {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        font-weight: 500;
+      }
+
+      .content-section {
+        padding: 4rem 0;
+      }
+
+      .section-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 3rem;
+        margin-bottom: 4rem;
+      }
+
+      .content-card {
+        background: var(--gradient-2);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 3rem;
+        position: relative;
+        overflow: hidden;
+        transition: all 0.4s ease;
+      }
+
+      .content-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, var(--accent) 0%, transparent 50%);
+        opacity: 0;
+        transition: opacity 0.4s ease;
+      }
+
+      .content-card:hover::before {
+        opacity: 0.05;
+      }
+
+      .content-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 30px 60px var(--shadow);
+        border-color: var(--accent);
+      }
+
+      .card-icon {
+        width: 60px;
+        height: 60px;
+        background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 2rem;
+        position: relative;
+        z-index: 1;
+      }
+
+      .card-icon svg {
+        width: 30px;
+        height: 30px;
+        color: white;
+      }
+
+      .card-title {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+        position: relative;
+        z-index: 1;
+      }
+
+      .card-content {
+        color: var(--text-secondary);
+        line-height: 1.8;
+        position: relative;
+        z-index: 1;
+      }
+
+      .team-section {
+        padding: 4rem 0;
+        text-align: center;
+      }
+
+      .section-title {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+      }
+
+      .section-subtitle {
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        max-width: 600px;
+        margin: 0 auto 3rem;
+      }
+
+      .values-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 2rem;
+        margin-top: 3rem;
+      }
+
+      .value-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 2.5rem;
+        text-align: left;
+        transition: all 0.3s ease;
+        position: relative;
+      }
+
+      .value-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 20px 40px var(--shadow);
+        border-color: var(--accent);
+      }
+
+      .value-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--accent);
+      }
+
+      .cta-section {
+        background: var(--gradient-2);
+        border: 1px solid var(--border);
+        border-radius: 24px;
+        padding: 4rem;
+        text-align: center;
+        margin: 4rem 0;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .cta-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, var(--accent) 0%, transparent 70%);
+        opacity: 0.03;
+      }
+
+      .cta-title {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+        position: relative;
+        z-index: 1;
+      }
+
+      .cta-text {
+        color: var(--text-secondary);
+        margin-bottom: 2rem;
+        font-size: 1.1rem;
+        position: relative;
+        z-index: 1;
+      }
+
+      .cta-button {
+        background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+        color: white;
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 12px;
+        font-size: 1.1rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+        transition: all 0.3s ease;
+        position: relative;
+        z-index: 1;
+      }
+
+      .cta-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0, 255, 136, 0.3);
+      }
+
+      /* Animations */
+      .fade-in {
+        opacity: 0;
+        transform: translateY(30px);
+        animation: fadeInUp 0.8s ease forwards;
+      }
+
+      .slide-up {
+        opacity: 0;
+        transform: translateY(50px);
+        animation: slideUp 0.8s ease forwards;
+      }
+
+      @keyframes fadeInUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes slideUp {
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      /* Responsive Design */
+      @media (max-width: 768px) {
+        .nav-links {
+          display: none;
+        }
+
+        .mobile-menu-button {
+          display: block;
+        }
+
+        .hero-title {
+          font-size: 2.5rem;
+        }
+
+        .section-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .content-card {
+          padding: 2rem;
+        }
+
+        .cta-section {
+          padding: 2rem;
+        }
+
+        .container {
+          padding: 0 1rem;
+        }
+      }
+
+      @media (max-width: 480px) {
+        .hero-title {
+          font-size: 2rem;
+        }
+
+        .hero-subtitle {
+          font-size: 1rem;
+        }
+
+        .stats-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .values-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="background-shapes">
+      <div class="shape"></div>
+      <div class="shape"></div>
+      <div class="shape"></div>
+    </div>
+
+    <header>
+      <div class="container">
+          <nav>
+              <a href="index.html" class="logo">TrustLens.AI</a>
+              <div class="nav-links">
+                  <a href="app.html" class="nav-link">Launch App</a>
+                  <a href="#" class="nav-link">Features</a>
+                  <a href="#" class="nav-link">Try Demo</a>
+                  <a href="about.html" class="nav-link">About</a>
+              </div>
+              <button class="theme-toggle">
+                  <svg class="theme-icon moon-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 11.807A9.002 9.002 0 0 1 10.049 2.5C5.056 2.5 1 6.556 1 11.5s4.056 9 9.049 9C15.543 20.5 19.5 16.444 19.5 11.5c0-.421-.04-.833-.117-1.231A6.995 6.995 0 0 0 12 11.807Z"></path></svg>
+                  <svg class="theme-icon sun-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12ZM11 1h2v3h-2V1Zm0 19h2v3h-2v-3ZM3.55 4.95l1.414-1.414L7.05 5.636 5.636 7.05 3.55 4.95ZM16.95 18.364l1.414-1.414L20.45 19.05l-1.414 1.414-2.086-2.086Zm-11.314 11.314 1.414 1.414L7.05 18.364 5.636 16.95l-2.086 2.086Zm13.435-1.414-1.414 1.414L16.95 18.364l1.414-1.414 2.086 2.086ZM1 11v2h3v-2H1Zm19 0v2h3v-2h-3Z"></path></svg>
+              </button>
+              <button class="mobile-menu-button">
+                  <svg class="menu-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18v2H3V4Zm0 7h18v2H3v-2Zm0 7h18v2H3v-2Z"></path></svg>
+              </button>
+          </nav>
+      </div>
+    </header>
+
+    <main>
+        <div class="hero-section">
+            <div class="container">
+                <h1 class="hero-title fade-in">Pioneering Trust in DeFi</h1>
+                <p class="hero-subtitle fade-in" style="animation-delay: 0.2s;">
+                    We're building the infrastructure for safe, transparent blockchain interactions through AI-powered risk analysis.
+                </p>
+
+                <div class="stats-grid slide-up" style="animation-delay: 0.4s;">
+                    <div class="stat-card">
+                        <span class="stat-number">10M+</span>
+                        <span class="stat-label">Wallets Analyzed</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">15+</span>
+                        <span class="stat-label">Blockchain Networks</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">99.7%</span>
+                        <span class="stat-label">Accuracy Rate</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">500K+</span>
+                        <span class="stat-label">Daily Analyses</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="content-section">
+            <div class="container">
+                <div class="section-grid">
+                    <div class="content-card slide-up" style="animation-delay: 0.6s;">
+                        <div class="card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </div>
+                        <h3 class="card-title">What We Do</h3>
+                        <p class="card-content">
+                            TrustLens.AI provides comprehensive risk analysis for on-chain wallet addresses using advanced AI and machine learning. We process millions of transactions, behavioral patterns, and network connections to generate intuitive trust scores that empower informed decision-making across the DeFi ecosystem.
+                        </p>
+                    </div>
+
+                    <div class="content-card slide-up" style="animation-delay: 0.8s;">
+                        <div class="card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                        </div>
+                        <h3 class="card-title">Our Vision</h3>
+                        <p class="card-content">
+                            We envision a decentralized future where transparency and security are the foundation of all blockchain interactions. By democratizing access to sophisticated risk analysis, we're building the trust infrastructure that will enable mainstream adoption of decentralized technologies.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="team-section">
+                    <h2 class="section-title fade-in">Our Core Values</h2>
+                    <p class="section-subtitle fade-in" style="animation-delay: 0.2s;">
+                        The principles that guide everything we build and every decision we make.
+                    </p>
+
+                    <div class="values-grid slide-up" style="animation-delay: 0.4s;">
+                        <div class="value-card">
+                            <h4 class="value-title">Transparency First</h4>
+                            <p class="card-content">
+                                We believe in open, explainable AI that users can understand and trust. Our risk scores come with clear reasoning and actionable insights.
+                            </p>
+                        </div>
+                        <div class="value-card">
+                            <h4 class="value-title">Privacy Protection</h4>
+                            <p class="card-content">
+                                While we analyze public blockchain data, we're committed to protecting user privacy and never storing personal information.
+                            </p>
+                        </div>
+                        <div class="value-card">
+                            <h4 class="value-title">Continuous Innovation</h4>
+                            <p class="card-content">
+                                The blockchain space evolves rapidly, and so do we. Our models continuously learn and adapt to new threats and patterns.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cta-section slide-up" style="animation-delay: 0.6s;">
+                    <h2 class="cta-title">Ready to Experience TrustLens.AI?</h2>
+                    <p class="cta-text">
+                        Join thousands of users who trust our platform to navigate the DeFi landscape safely.
+                    </p>
+                    <a href="app.html" class="cta-button">Launch App</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Theme Management
+        const themeToggle = document.querySelector('.theme-toggle');
+        const mobileMenuButton = document.querySelector('.mobile-menu-button');
+        const header = document.querySelector('header');
+
+        // Theme switching
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            if (currentTheme === 'light') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+            }
+        });
+
+        // Set initial theme
+        const savedTheme = 'dark'; // Default to dark theme
+        document.documentElement.setAttribute('data-theme', savedTheme);
+
+        // Header scroll effect
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 10) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        });
+
+        // Smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Intersection Observer for animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animationPlayState = 'running';
+                }
+            });
+        }, observerOptions);
+
+        // Observe all animated elements
+        document.querySelectorAll('.fade-in, .slide-up').forEach(el => {
+            el.style.animationPlayState = 'paused';
+            observer.observe(el);
+        });
+
+        // Counter animation for stats
+        function animateCounter(element, target, duration = 2000) {
+            let start = 0;
+            const increment = target / (duration / 16);
+            
+            function updateCounter() {
+                start += increment;
+                if (start < target) {
+                    element.textContent = Math.floor(start).toLocaleString();
+                    requestAnimationFrame(updateCounter);
+                } else {
+                    element.textContent = target.toLocaleString();
+                }
+            }
+            
+            updateCounter();
+        }
+
+        // Animate stats when they come into view
+        const statsObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const statNumber = entry.target.querySelector('.stat-number');
+                    const text = statNumber.textContent;
+                    const number = parseInt(text.replace(/[^\d]/g, ''));
+                    
+                    if (number && !entry.target.hasAttribute('data-animated')) {
+                        entry.target.setAttribute('data-animated', 'true');
+                        
+                        // Handle different number formats
+                        if (text.includes('M+')) {
+                            animateCounter(statNumber, number, 2000);
+                            setTimeout(() => {
+                                statNumber.textContent = number + 'M+';
+                            }, 2000);
+                        } else if (text.includes('K+')) {
+                            animateCounter(statNumber, number, 2000);
+                            setTimeout(() => {
+                                statNumber.textContent = number + 'K+';
+                            }, 2000);
+                        } else if (text.includes('%')) {
+                            animateCounter(statNumber, number, 2000);
+                            setTimeout(() => {
+                                statNumber.textContent = number + '%';
+                            }, 2000);
+                        } else if (text.includes('+')) {
+                            animateCounter(statNumber, number, 2000);
+                            setTimeout(() => {
+                                statNumber.textContent = number + '+';
+                            }, 2000);
+                        }
+                    }
+                }
+            });
+        }, { threshold: 0.5 });
+
+        document.querySelectorAll('.stat-card').forEach(card => {
+            statsObserver.observe(card);
+        });
+    </script>
+  </body>
+</html>

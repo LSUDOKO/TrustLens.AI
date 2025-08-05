@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TrustLens.AI - On-Chain Wallet Trust & Risk Analysis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-gradient: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #000000 100%);
+            --secondary-gradient: linear-gradient(135deg, #ffffff 0%, #f5f5f5 50%, #e0e0e0 100%);
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+            --text-primary: #ffffff;
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            --accent-gradient: linear-gradient(135deg, #4a4a4a 0%, #6a6a6a 100%);
+            --button-text: #000000;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+        }
+
+        [data-theme="light"] {
+            --primary-gradient: linear-gradient(135deg, #ffffff 0%, #f8f9fa 50%, #e9ecef 100%);
+            --secondary-gradient: linear-gradient(135deg, #000000 0%, #2d2d2d 50%, #4a4a4a 100%);
+            --glass-bg: rgba(0, 0, 0, 0.08);
+            --glass-border: rgba(0, 0, 0, 0.15);
+            --text-primary: #000000;
+            --text-secondary: rgba(0, 0, 0, 0.7);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+            --accent-gradient: linear-gradient(135deg, #e0e0e0 0%, #c0c0c0 100%);
+            --button-text: #ffffff;
+        }
+
+        [data-theme="light"] .nav-links a,
+        [data-theme="light"] .nav-link {
+            color: var(--text-primary) !important; /* Use important to ensure override */
+            background: rgba(0, 0, 0, 0.05);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .nav-links a:hover,
+        [data-theme="light"] .nav-link:hover {
+            background: rgba(0, 0, 0, 0.1);
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--primary-gradient);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            min-height: 100vh;
+        }
+
+        .background-shapes {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .shape {
+            position: absolute;
+            border-radius: 50%;
+            background: var(--secondary-gradient);
+            animation: float 20s infinite ease-in-out;
+            opacity: 0.1;
+        }
+
+        .shape:nth-child(1) {
+            width: 300px;
+            height: 300px;
+            top: -150px;
+            right: -150px;
+            animation-delay: -2s;
+        }
+
+        .shape:nth-child(2) {
+            width: 200px;
+            height: 200px;
+            bottom: -100px;
+            left: -100px;
+            animation-delay: -5s;
+        }
+
+        .shape:nth-child(3) {
+            width: 150px;
+            height: 150px;
+            top: 50%;
+            left: 10%;
+            animation-delay: -8s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            33% { transform: translateY(-30px) rotate(120deg); }
+            66% { transform: translateY(15px) rotate(240deg); }
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--shadow);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Header Styles */
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            padding: 1rem 0;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--secondary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: pulse 3s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .nav-links {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-primary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .nav-link:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.1);
+        }
+
+        .theme-toggle {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            box-shadow: var(--shadow);
+        }
+
+        .theme-icon {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s ease;
+            fill: var(--text-primary);
+        }
+
+        /* Main App Styles */
+        main {
+            padding-top: 100px;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .app-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .app-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 1rem;
+            background: var(--secondary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .app-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .search-section {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .search-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--secondary-gradient);
+            opacity: 0.5;
+        }
+
+        .search-form {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-input {
+            flex: 1;
+            padding: 1rem 1.5rem;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .search-input:focus {
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .search-button {
+            padding: 1rem 2rem;
+            background: var(--secondary-gradient);
+            color: var(--button-text);
+            border: none;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .search-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .search-button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .search-button:hover::before {
+            left: 100%;
+        }
+
+        .search-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .search-examples {
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        .example-addresses {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-top: 0.5rem;
+        }
+
+        .example-address {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: monospace;
+        }
+
+        .example-address:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: var(--text-primary);
+            transform: translateY(-2px);
+        }
+
+        .loading-spinner {
+            display: none;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--glass-border);
+            border-top: 3px solid var(--text-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results-section {
+            display: none;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .results-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: var(--secondary-gradient);
+            opacity: 0.5;
+        }
+
+        .trust-score {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .score-value {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+
+        .score-high { color: var(--success-color); }
+        .score-medium { color: var(--warning-color); }
+        .score-low { color: var(--danger-color); }
+
+        .score-label {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
+        }
+
+        .score-description {
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border-left: 4px solid var(--info-color);
+        }
+
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .analysis-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .analysis-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .card-content {
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .risk-indicators {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .risk-tag {
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .risk-low {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success-color);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .risk-medium {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning-color);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .risk-high {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger-color);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .search-form {
+                flex-direction: column;
+            }
+
+            .app-title {
+                font-size: 2rem;
+            }
+
+            .container, .app-container {
+                padding: 0 1rem;
+            }
+
+            .example-addresses {
+                flex-direction: column;
+                align-items: center;
+            }
+        }
+
+        .mobile-menu {
+            display: none;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 0.5rem;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .mobile-menu {
+                display: block;
+            }
+        }
+
+        .menu-icon {
+            width: 24px;
+            height: 24px;
+            fill: var(--text-primary);
+        }
+
+        /* Animation Classes */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Wallet Overview Metrics */
+        .wallet-overview {
+            margin-top: 2rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .metric-card {
+            display: flex;
+            gap: 0.5rem;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .metric-icon {
+            font-size: 1.2rem;
+            color: var(--text-primary);
+        }
+
+        .metric-content {
+            flex: 1;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.2rem;
+        }
+
+        .metric-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+    </style>
+  </head>
+  <body>
+    <div class="background-shapes">
+        <div class="shape"></div>
+        <div class="shape"></div>
+        <div class="shape"></div>
+    </div>
+
+    <header id="header">
+        <div class="container">
+            <nav>
+                <div class="logo">🔍 TrustLens.AI</div>
+                <ul class="nav-links">
+                    <li><a href="index.html" class="nav-link">Home</a></li>
+                    <li><a href="#features" class="nav-link">Features</a></li>
+                    <li><a href="#about" class="nav-link">About</a></li>
+                </ul>
+                <button class="theme-toggle" id="themeToggle">
+                    <svg class="theme-icon" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                    </svg>
+                </button>
+                <div class="mobile-menu">
+                    <svg class="menu-icon" viewBox="0 0 24 24">
+                        <path d="M3 12h18M3 6h18M3 18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <div id="root">
+            <div class="container">
+                <div class="app-container">
+                    <div class="app-header">
+                        <h1 class="app-title">TrustLens.AI 🔍</h1>
+                        <p class="app-subtitle">
+                            A comprehensive web application that analyzes wallet addresses and provides AI-powered trust scores and risk assessments across multiple blockchain networks.
+                        </p>
+                    </div>
+
+                    <div class="search-section">
+                        <form class="search-form" id="walletForm">
+                            <input 
+                                type="text" 
+                                class="search-input" 
+                                id="walletInput"
+                                placeholder="Enter wallet address (0x... or ENS domain)"
+                                required
+                            >
+                            <button type="submit" class="search-button" id="analyzeButton">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                </svg>
+                                Analyze Wallet
+                            </button>
+                        </form>
+                        
+                        <div class="search-examples">
+                            <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem;">Try these example addresses:</p>
+                            <div class="example-addresses">
+                                <span class="example-address" data-address="0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045">0xd8dA...6045</span>
+                                <span class="example-address" data-address="0x8ba1f109551bD432803012645Hac136c22C177fa">0x8ba1...77fa</span>
+                                <span class="example-address" data-address="vitalik.eth">vitalik.eth</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="loading-spinner" id="loadingSpinner">
+                        <div class="spinner"></div>
+                        <p style="color: var(--text-secondary);">Analyzing wallet address...</p>
+                        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-top: 0.5rem;">This may take a few moments</p>
+                    </div>
+
+                    <div class="results-section" id="resultsSection">
+                        <div class="trust-score">
+                            <div class="score-value score-high" id="trustScore">85</div>
+                            <div class="score-label">Trust Score</div>
+                            <div class="score-description" id="scoreDescription">
+                                This wallet demonstrates strong trustworthiness with consistent transaction patterns and positive on-chain behavior.
+                            </div>
+                        </div>
+
+                        <!-- Wallet Overview Metrics -->
+                        <div class="wallet-overview">
+                            <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.2rem;">📊 Wallet Overview</h3>
+                            <div class="metrics-grid">
+                                <div class="metric-card">
+                                    <div class="metric-icon">⏰</div>
+                                    <div class="metric-content">
+                                        <div class="metric-label">Wallet Age</div>
+                                        <div class="metric-value" id="walletAge">--</div>
+                                    </div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-icon">💰</div>
+                                    <div class="metric-content">
+                                        <div class="metric-label">Current Balance</div>
+                                        <div class="metric-value" id="currentBalance">--</div>
+                                    </div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-icon">🔄</div>
+                                    <div class="metric-content">
+                                        <div class="metric-label">Total Transactions</div>
+                                        <div class="metric-value" id="totalTransactions">--</div>
+                                    </div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-icon">📅</div>
+                                    <div class="metric-content">
+                                        <div class="metric-label">Last Activity</div>
+                                        <div class="metric-value" id="lastActivity">--</div>
+                                    </div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-icon">📈</div>
+                                    <div class="metric-content">
+                                        <div class="metric-label">Avg. Daily Transactions</div>
+                                        <div class="metric-value" id="avgDailyTx">--</div>
+                                    </div>
+                                </div>
+                                <div class="metric-card">
+                                    <div class="metric-icon">🏦</div>
+                                    <div class="metric-content">
+                                        <div class="metric-label">DeFi Protocols</div>
+                                        <div class="metric-value" id="defiProtocols">--</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analysis-grid">
+                            <div class="analysis-card">
+                                <div class="card-title">🔒 Security Analysis</div>
+                                <div class="card-content" id="securityAnalysis">
+                                    No suspicious activities detected. The wallet shows normal transaction patterns with established counterparties.
+                                </div>
+                                <div class="risk-indicators">
+                                    <span class="risk-tag risk-low">Low Risk</span>
+                                    <span class="risk-tag risk-low">Verified</span>
+                                </div>
+                            </div>
+
+                            <div class="analysis-card">
+                                <div class="card-title">📊 Transaction Patterns</div>
+                                <div class="card-content" id="transactionAnalysis">
+                                    Regular transaction frequency with balanced inflow and outflow patterns. No unusual spikes or suspicious timing detected.
+                                </div>
+                                <div class="risk-indicators">
+                                    <span class="risk-tag risk-low">Normal Activity</span>
+                                </div>
+                            </div>
+
+                            <div class="analysis-card">
+                                <div class="card-title">🌐 Network Activity</div>
+                                <div class="card-content" id="networkAnalysis">
+                                    Active across multiple protocols with diversified DeFi interactions. Strong network connectivity and reputation.
+                                </div>
+                                <div class="risk-indicators">
+                                    <span class="risk-tag risk-low">Multi-Chain</span>
+                                    <span class="risk-tag risk-low">DeFi Active</span>
+                                </div>
+                            </div>
+
+                            <div class="analysis-card">
+                                <div class="card-title">💎 Identity & Social</div>
+                                <div class="card-content" id="identityAnalysis">
+                                    Wallet has established identity markers and social connections that enhance trustworthiness.
+                                </div>
+                                <div class="risk-indicators" id="identityTags">
+                                    <span class="risk-tag risk-low">ENS Domain</span>
+                                    <span class="risk-tag risk-low">Social Verified</span>
+                                </div>
+                            </div>
+
+                            <div class="analysis-card">
+                                <div class="card-title">⚠️ Risk Factors</div>
+                                <div class="card-content" id="riskFactors">
+                                    No significant risk factors detected. Wallet operates within normal parameters.
+                                </div>
+                                <div class="risk-indicators" id="riskTags">
+                                    <span class="risk-tag risk-low">Clean History</span>
+                                </div>
+                            </div>
+
+                            <div class="analysis-card">
+                                <div class="card-title">🤖 AI Insights</div>
+                                <div class="card-content" id="aiInsights">
+                                    Based on machine learning analysis, this wallet exhibits patterns consistent with legitimate long-term crypto usage and investment behavior.
+                                </div>
+                                <div class="risk-indicators">
+                                    <span class="risk-tag risk-low">Legitimate Use</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        // Theme Toggle
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+
+        themeToggle.addEventListener('click', () => {
+            body.dataset.theme = body.dataset.theme === 'light' ? '' : 'light';
+            
+            // Smooth transition effect
+            themeToggle.style.transform = 'rotate(360deg)';
+            setTimeout(() => {
+                themeToggle.style.transform = '';
+            }, 300);
+        });
+
+        // Form handling
+        const walletForm = document.getElementById('walletForm');
+        const walletInput = document.getElementById('walletInput');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const resultsSection = document.getElementById('resultsSection');
+
+        // Example addresses
+        const exampleAddresses = document.querySelectorAll('.example-address');
+        exampleAddresses.forEach(addr => {
+            addr.addEventListener('click', () => {
+                walletInput.value = addr.dataset.address;
+                walletInput.focus();
+            });
+        });
+
+        // Form submission
+        walletForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const address = walletInput.value.trim();
+            if (!address) return;
+
+            // Show loading
+            loadingSpinner.style.display = 'block';
+            resultsSection.style.display = 'none';
+            analyzeButton.disabled = true;
+
+            try {
+                // Simulate API call
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Generate mock analysis
+                const analysis = generateMockAnalysis(address);
+                displayResults(analysis);
+                
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                alert('Failed to analyze wallet. Please try again.');
+            } finally {
+                loadingSpinner.style.display = 'none';
+                analyzeButton.disabled = false;
+            }
+        });
+
+        function generateMockAnalysis(address) {
+            const scores = [75, 85, 92, 68, 78, 88, 95];
+            const score = scores[Math.floor(Math.random() * scores.length)];
+            
+            // Generate realistic wallet metrics
+            const walletAgeMonths = Math.floor(Math.random() * 36) + 3; // 3-39 months
+            const walletAgeYears = Math.floor(walletAgeMonths / 12);
+            const remainingMonths = walletAgeMonths % 12;
+            const walletAgeText = walletAgeYears > 0 
+                ? `${walletAgeYears} year${walletAgeYears > 1 ? 's' : ''} ${remainingMonths > 0 ? `${remainingMonths} month${remainingMonths > 1 ? 's' : ''}` : ''}`
+                : `${remainingMonths} month${remainingMonths > 1 ? 's' : ''}`;
+            
+            const balance = (Math.random() * 50 + 0.1).toFixed(2);
+            const txCount = Math.floor(Math.random() * 2000) + 50;
+            const lastActivityHours = Math.floor(Math.random() * 168); // 0-168 hours (1 week)
+            const lastActivityText = lastActivityHours < 1 
+                ? 'Less than 1 hour ago'
+                : lastActivityHours < 24 
+                ? `${lastActivityHours} hour${lastActivityHours > 1 ? 's' : ''} ago`
+                : `${Math.floor(lastActivityHours / 24)} day${Math.floor(lastActivityHours / 24) > 1 ? 's' : ''} ago`;
+            
+            const avgDaily = (txCount / (walletAgeMonths * 30)).toFixed(1);
+            
+            // DeFi protocols based on score
+            const allProtocols = ['Uniswap', 'Aave', 'Compound', 'MakerDAO', 'Curve', 'SushiSwap', 'Balancer', 'Yearn'];
+            const protocolCount = score >= 80 ? Math.floor(Math.random() * 4) + 3 : score >= 60 ? Math.floor(Math.random() * 3) + 1 : Math.floor(Math.random() * 2);
+            const selectedProtocols = allProtocols.slice(0, protocolCount).join(', ');
+            
+            // Identity factors
+            const hasENS = score >= 70 && Math.random() > 0.3;
+            const hasSocial = score >= 60 && Math.random() > 0.4;
+            const hasGitHub = score >= 80 && Math.random() > 0.6;
+            
+            // Risk factors based on score
+            const riskFactors = [];
+            if (score < 60) {
+                const possibleRisks = ['Recent creation', 'Low activity', 'Unusual patterns', 'Limited history'];
+                riskFactors.push(...possibleRisks.slice(0, Math.floor(Math.random() * 2) + 1));
+            } else if (score < 80) {
+                const possibleRisks = ['Moderate activity', 'Limited social presence'];
+                if (Math.random() > 0.7) riskFactors.push(possibleRisks[Math.floor(Math.random() * possibleRisks.length)]);
+            }
+            
+            return {
+                trustScore: score,
+                riskLevel: score >= 80 ? 'low' : score >= 60 ? 'medium' : 'high',
+                securityAnalysis: score >= 80 
+                    ? "No suspicious activities detected. The wallet shows normal transaction patterns with established counterparties."
+                    : score >= 60 
+                    ? "Some irregular patterns detected but within acceptable risk parameters. Monitor for unusual activity."
+                    : "Multiple risk factors identified. Exercise caution when interacting with this wallet.",
+                transactionAnalysis: score >= 80
+                    ? "Regular transaction frequency with balanced inflow and outflow patterns. No unusual spikes or suspicious timing detected."
+                    : score >= 60
+                    ? "Transaction patterns show some irregularities but remain within normal parameters. Activity appears legitimate."
+                    : "Transaction patterns show concerning irregularities. Limited transaction history or unusual timing patterns detected.",
+                networkAnalysis: score >= 80
+                    ? "Active across multiple protocols with diversified DeFi interactions. Strong network connectivity and reputation."
+                    : score >= 60
+                    ? "Moderate network activity with some DeFi interactions. Building network reputation."
+                    : "Limited network activity. Few protocol interactions and minimal network connections detected.",
+                identityAnalysis: hasENS || hasSocial || hasGitHub
+                    ? `Wallet has ${hasENS ? 'ENS domain registration' : ''}${hasENS && (hasSocial || hasGitHub) ? ', ' : ''}${hasSocial ? 'social media verification' : ''}${(hasENS || hasSocial) && hasGitHub ? ', and ' : ''}${hasGitHub ? 'GitHub profile linkage' : ''} that enhance${hasENS || hasSocial || hasGitHub ? '' : 's'} trustworthiness.`
+                    : "Limited identity verification. No ENS domain or social media connections detected.",
+                riskFactors: riskFactors.length > 0 
+                    ? `Risk factors identified: ${riskFactors.join(', ')}. Exercise appropriate caution.`
+                    : "No significant risk factors detected. Wallet operates within normal parameters.",
+                aiInsights: score >= 80 
+                    ? "Based on machine learning analysis, this wallet exhibits patterns consistent with legitimate long-term crypto usage and investment behavior."
+                    : score >= 60
+                    ? "AI analysis indicates moderate risk profile. Wallet shows mixed signals requiring careful evaluation."
+                    : "AI analysis suggests elevated risk factors. Recommend additional verification before significant transactions.",
+                walletMetrics: {
+                    walletAge: walletAgeText.trim(),
+                    currentBalance: `${balance} ETH`,
+                    totalTransactions: txCount.toLocaleString(),
+                    lastActivity: lastActivityText,
+                    avgDailyTx: avgDaily,
+                    defiProtocols: selectedProtocols || 'None detected'
+                },
+                identityTags: [
+                    ...(hasENS ? ['ENS Domain'] : []),
+                    ...(hasSocial ? ['Social Verified'] : []),
+                    ...(hasGitHub ? ['GitHub Linked'] : []),
+                    ...(score >= 80 ? ['Established'] : [])
+                ],
+                riskTags: riskFactors.length > 0 ? riskFactors : ['Clean History']
+            };
+        }
+
+        function displayResults(analysis) {
+            const trustScore = document.getElementById('trustScore');
+            const scoreDescription = document.getElementById('scoreDescription');
+            const securityAnalysis = document.getElementById('securityAnalysis');
+            const transactionAnalysis = document.getElementById('transactionAnalysis');
+            const networkAnalysis = document.getElementById('networkAnalysis');
+            const identityAnalysis = document.getElementById('identityAnalysis');
+            const riskFactors = document.getElementById('riskFactors');
+            const aiInsights = document.getElementById('aiInsights');
+            const walletAge = document.getElementById('walletAge');
+            const currentBalance = document.getElementById('currentBalance');
+            const totalTransactions = document.getElementById('totalTransactions');
+            const lastActivity = document.getElementById('lastActivity');
+            const avgDailyTx = document.getElementById('avgDailyTx');
+            const defiProtocols = document.getElementById('defiProtocols');
+            const identityTags = document.getElementById('identityTags');
+            const riskTags = document.getElementById('riskTags');
+
+            // Update trust score
+            trustScore.textContent = analysis.trustScore;
+            trustScore.className = `score-value score-${analysis.riskLevel === 'low' ? 'high' : analysis.riskLevel === 'medium' ? 'medium' : 'low'}`;
+            
+            // Update descriptions
+            scoreDescription.textContent = analysis.riskLevel === 'low' 
+                ? "This wallet demonstrates strong trustworthiness with consistent transaction patterns and positive on-chain behavior."
+                : analysis.riskLevel === 'medium'
+                ? "This wallet shows moderate risk indicators. Exercise normal caution in transactions."
+                : "This wallet exhibits high-risk characteristics. Proceed with extreme caution.";
+
+            securityAnalysis.textContent = analysis.securityAnalysis;
+            transactionAnalysis.textContent = analysis.transactionAnalysis;
+            networkAnalysis.textContent = analysis.networkAnalysis;
+            identityAnalysis.textContent = analysis.identityAnalysis;
+            riskFactors.textContent = analysis.riskFactors;
+            aiInsights.textContent = analysis.aiInsights;
+
+            // Update wallet metrics
+            walletAge.textContent = analysis.walletMetrics.walletAge;
+            currentBalance.textContent = analysis.walletMetrics.currentBalance;
+            totalTransactions.textContent = analysis.walletMetrics.totalTransactions;
+            lastActivity.textContent = analysis.walletMetrics.lastActivity;
+            avgDailyTx.textContent = analysis.walletMetrics.avgDailyTx;
+            defiProtocols.textContent = analysis.walletMetrics.defiProtocols;
+
+            // Update identity tags
+            identityTags.innerHTML = '';
+            analysis.identityTags.forEach(tag => {
+                const tagElement = document.createElement('span');
+                tagElement.className = `risk-tag ${analysis.riskLevel === 'low' ? 'risk-low' : analysis.riskLevel === 'medium' ? 'risk-medium' : 'risk-high'}`;
+                tagElement.textContent = tag;
+                identityTags.appendChild(tagElement);
+            });
+
+            // Update risk tags
+            riskTags.innerHTML = '';
+            analysis.riskTags.forEach(tag => {
+                const tagElement = document.createElement('span');
+                tagElement.className = `risk-tag ${analysis.riskLevel === 'low' ? 'risk-low' : analysis.riskLevel === 'medium' ? 'risk-medium' : 'risk-high'}`;
+                tagElement.textContent = tag;
+                riskTags.appendChild(tagElement);
+            });
+
+            // Show results with animation
+            resultsSection.style.display = 'block';
+            resultsSection.classList.add('fade-in');
+            
+            // Scroll to results
+            resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        // Particle effect on cursor
+        document.addEventListener('mousemove', (e) => {
+            if (Math.random() > 0.95) {
+                const cursor = document.createElement('div');
+                cursor.style.cssText = `
+                    position: fixed;
+                    width: 4px;
+                    height: 4px;
+                    background: var(--secondary-gradient);
+                    border-radius: 50%;
+                    pointer-events: none;
+                    left: ${e.clientX - 2}px;
+                    top: ${e.clientY - 2}px;
+                    opacity: 0.8;
+                    animation: fadeOut 0.5s ease-out forwards;
+                    z-index: 9999;
+                `;
+                document.body.appendChild(cursor);
+                
+                setTimeout(() => cursor.remove(), 500);
+            }
+        });
+
+        // Add fadeOut animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes fadeOut {
+                to {
+                    opacity: 0;
+                    transform: scale(0);
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Loading animation
+        window.addEventListener('load', () => {
+            document.body.style.opacity = '0';
+            document.body.style.transition = 'opacity 0.5s ease';
+            setTimeout(() => {
+                document.body.style.opacity = '1';
+            }, 100);
+        });
+
+        // Add hover effects for cards
+        document.querySelectorAll('.analysis-card, .search-section').forEach(card => {
+            card.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-5px) scale(1.02)';
+            });
+            
+            card.addEventListener('mouseleave', function() {
+                this.style.transform = '';
+            });
+        });
+
+        // Input validation
+        walletInput.addEventListener('input', (e) => {
+            const value = e.target.value;
+            const isValid = /^(0x[a-fA-F0-9]{40}|.*\.eth)$/.test(value) || value.length === 0;
+            
+            if (!isValid && value.length > 0) {
+                e.target.style.borderColor = 'var(--danger-color)';
+            } else {
+                e.target.style.borderColor = '';
+            }
+        });
+
+        // Auto-complete for common addresses
+        const commonAddresses = [
+            { name: 'Vitalik Buterin', address: 'vitalik.eth' },
+            { name: 'Uniswap V3', address: '0x1F98431c8aD98523631AE4a59f267346ea31F984' },
+            { name: 'USDC Contract', address: '0xA0b86a33E6D01547e04eB0606F2e1dEB9DbCe9a' }
+        ];
+
+        // Enhanced form validation
+        function validateWalletAddress(address) {
+            // Ethereum address pattern
+            const ethPattern = /^0x[a-fA-F0-9]{40}$/;
+            // ENS domain pattern
+            const ensPattern = /^[a-zA-Z0-9-]+\.eth$/;
+            
+            return ethPattern.test(address) || ensPattern.test(address);
+        }
+
+        // Update form submission with better validation
+        walletForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const address = walletInput.value.trim();
+            if (!address) {
+                alert('Please enter a wallet address');
+                return;
+            }
+
+            if (!validateWalletAddress(address)) {
+                alert('Please enter a valid Ethereum address (0x...) or ENS domain (.eth)');
+                return;
+            }
+
+            // Show loading
+            loadingSpinner.style.display = 'block';
+            resultsSection.style.display = 'none';
+            analyzeButton.disabled = true;
+
+            try {
+                // Simulate API call with realistic delay
+                await new Promise(resolve => setTimeout(resolve, 1500 + Math.random() * 1000));
+                
+                // Generate mock analysis
+                const analysis = generateMockAnalysis(address);
+                displayResults(analysis);
+                
+            } catch (error) {
+                console.error('Analysis failed:', error);
+                alert('Failed to analyze wallet. Please try again.');
+            } finally {
+                loadingSpinner.style.display = 'none';
+                analyzeButton.disabled = false;
+            }
+        });
+    </script>
+  </body>
+</html>

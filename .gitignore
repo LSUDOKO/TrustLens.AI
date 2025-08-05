@@ -4,12 +4,7 @@
 
 # ==================== ENVIRONMENT & SECRETS ====================
 # Environment variables and sensitive data
-.env
-.env.local
-.env.production
-.env.staging
-.env.development
-*.env
+
 
 # API Keys and tokens
 config.json

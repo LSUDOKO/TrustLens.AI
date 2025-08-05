@@ -24,3 +24,6 @@ web3>=6.0.0
 # Data processing
 numpy>=1.24.0
 pandas>=2.0.0
+
+# AI Agent Framework
+alith

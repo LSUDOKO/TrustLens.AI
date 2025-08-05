@@ -8,6 +8,7 @@ from enum import Enum
 import json
 import hashlib
 from functools import lru_cache
+from alith import Agent  # Import the Alith Agent
 import numpy as np
 from collections import defaultdict
 import time
@@ -537,44 +538,39 @@ class AdvancedTrustScorer:
     
     async def _generate_explanation(self, metrics: WalletMetrics, risk_factors: List[RiskFactor], 
                                   score: float, risk_level: RiskLevel) -> str:
-        """Generate natural language explanation"""
-        address_short = f"{metrics.address[:6]}...{metrics.address[-4:]}"
-        
-        explanation_parts = [f"Wallet {address_short} "]
-        
-        # Risk level assessment
-        if risk_level == RiskLevel.HIGH_TRUST:
-            explanation_parts.append("demonstrates high trustworthiness")
-        elif risk_level == RiskLevel.MEDIUM_TRUST:
-            explanation_parts.append("shows moderate trustworthiness")
-        elif risk_level == RiskLevel.LOW_TRUST:
-            explanation_parts.append("presents some risk factors")
-        else:
-            explanation_parts.append("exhibits significant risk characteristics")
-        
-        explanation_parts.append(f" with a trust score of {int(score)}. ")
-        
-        # Key factors
-        positive_factors = [rf for rf in risk_factors if rf.severity > 0]
-        negative_factors = [rf for rf in risk_factors if rf.severity < 0]
-        
-        if positive_factors:
-            explanation_parts.append("Positive indicators include: ")
-            explanation_parts.append(", ".join([rf.description.lower() for rf in positive_factors[:2]]))
-            explanation_parts.append(". ")
-        
-        if negative_factors:
-            explanation_parts.append("Risk factors include: ")
-            explanation_parts.append(", ".join([rf.description.lower() for rf in negative_factors[:2]]))
-            explanation_parts.append(". ")
-        
-        # Activity summary
-        explanation_parts.append(f"The wallet has {metrics.tx_count} transactions over {metrics.age_days} days")
-        if metrics.defi_protocols > 0:
-            explanation_parts.append(f" with interaction across {metrics.defi_protocols} DeFi protocols")
-        explanation_parts.append(".")
-        
-        return "".join(explanation_parts)
+        """Generate natural language explanation using the Alith AI Agent."""
+        logger.info(f"Generating explanation for {metrics.address[:8]} using Alith Agent...")
+
+        # NOTE: Alith Agent requires an underlying LLM API key.
+        # Ensure OPENAI_API_KEY (or other provider) is set in your environment.
+        try:
+            agent = Agent(
+                model="gpt-4",  # Or another powerful model like 'claude-3-opus-20240229'
+                preamble="You are an expert Web3 risk analyst for a service called TrustLens. Your role is to provide a clear, concise, and insightful trust analysis of an Ethereum wallet based on the data provided. Structure your response in three parts: 1. A one-sentence summary of the wallet's risk profile. 2. A brief explanation of the key positive indicators. 3. A brief explanation of the key negative risk factors. Be professional and objective."
+            )
+
+            positive_indicators = [rf.description for rf in risk_factors if rf.severity > 0]
+            negative_indicators = [rf.description for rf in risk_factors if rf.severity < 0]
+
+            prompt = (
+                f"Please provide a trust analysis for a wallet with the following characteristics:\n\n"
+                f"- Final Trust Score: {int(score)}/100\n"
+                f"- Assessed Risk Level: {risk_level.value}\n"
+                f"- Wallet Age: {metrics.age_days} days\n"
+                f"- Total Transactions: {metrics.tx_count}\n"
+                f"- DeFi Protocol Interactions: {metrics.defi_protocols}\n"
+                f"- Key Positive Indicators: {positive_indicators or 'None'}\n"
+                f"- Key Negative Indicators: {negative_indicators or 'None'}\n"
+            )
+
+            # Run the synchronous Alith prompt in a separate thread to avoid blocking the asyncio event loop.
+            explanation = await asyncio.to_thread(agent.prompt, prompt)
+            logger.info(f"Successfully generated explanation for {metrics.address[:8]}")
+            return explanation
+
+        except Exception as e:
+            logger.error(f"Failed to generate explanation using Alith Agent for {metrics.address[:8]}: {e}")
+            return "AI-powered explanation is currently unavailable due to a configuration issue. Please ensure your API key is set correctly."
     
     def _get_feature_contributions(self, features: Dict[str, float]) -> Dict[str, float]:
         """Get feature contributions to final score"""
@@ -596,20 +592,105 @@ async def analyze_wallet(address: str) -> Dict:
         scorer = AdvancedTrustScorer()
         trust_analysis = await scorer.calculate_trust_score(wallet_metrics)
         
+        # Format wallet age
+        age_days = wallet_metrics.age_days
+        if age_days >= 365:
+            years = age_days // 365
+            remaining_days = age_days % 365
+            months = remaining_days // 30
+            age_text = f"{years} year{'s' if years > 1 else ''}"
+            if months > 0:
+                age_text += f" {months} month{'s' if months > 1 else ''}"
+        elif age_days >= 30:
+            months = age_days // 30
+            age_text = f"{months} month{'s' if months > 1 else ''}"
+        else:
+            age_text = f"{age_days} day{'s' if age_days > 1 else ''}"
+        
+        # Format last activity
+        last_activity_days = wallet_metrics.last_activity_days
+        if last_activity_days == 0:
+            last_activity_text = "Today"
+        elif last_activity_days == 1:
+            last_activity_text = "1 day ago"
+        elif last_activity_days < 7:
+            last_activity_text = f"{last_activity_days} days ago"
+        elif last_activity_days < 30:
+            weeks = last_activity_days // 7
+            last_activity_text = f"{weeks} week{'s' if weeks > 1 else ''} ago"
+        else:
+            months = last_activity_days // 30
+            last_activity_text = f"{months} month{'s' if months > 1 else ''} ago"
+        
+        # Generate DeFi protocol list
+        defi_protocols = []
+        if wallet_metrics.defi_protocols > 0:
+            # Mock protocol names based on activity level
+            all_protocols = ['Uniswap', 'Aave', 'Compound', 'MakerDAO', 'Curve', 'SushiSwap', 'Balancer', 'Yearn']
+            protocol_count = min(wallet_metrics.defi_protocols, len(all_protocols))
+            defi_protocols = all_protocols[:protocol_count]
+        
+        # Generate identity tags
+        identity_tags = []
+        if wallet_metrics.has_ens:
+            identity_tags.append("ENS Domain")
+        if wallet_metrics.has_github:
+            identity_tags.append("GitHub Linked")
+        if wallet_metrics.has_farcaster:
+            identity_tags.append("Farcaster")
+        if wallet_metrics.has_lens:
+            identity_tags.append("Lens Protocol")
+        if wallet_metrics.has_twitter:
+            identity_tags.append("Twitter Verified")
+        if wallet_metrics.verified_credentials > 0:
+            identity_tags.append("Verified")
+        
+        # Generate risk tags based on analysis
+        risk_tags = []
+        if trust_analysis["score"] >= 80:
+            risk_tags.extend(["Clean History", "Established"])
+        elif trust_analysis["score"] >= 60:
+            risk_tags.extend(["Moderate Risk", "Active"])
+        else:
+            risk_tags.extend(["High Risk", "Caution Advised"])
+            
+        if wallet_metrics.flagged_interactions > 0:
+            risk_tags.append("Flagged Interactions")
+        if wallet_metrics.wash_trading_score > 0.5:
+            risk_tags.append("Wash Trading")
+        
         return {
             "address": address,
-            "analysis": trust_analysis,
+            "analysis": {
+                **trust_analysis,
+                "identity_analysis": f"Wallet has {len(identity_tags)} identity verification{'s' if len(identity_tags) != 1 else ''} " +
+                                   f"and {wallet_metrics.defi_protocols} DeFi protocol interaction{'s' if wallet_metrics.defi_protocols != 1 else ''}.",
+                "risk_factors": "No significant risk factors detected." if trust_analysis["score"] >= 80 
+                              else f"Risk factors detected: {', '.join(risk_tags[:3])}. Exercise appropriate caution."
+            },
+            "wallet_metrics": {
+                "wallet_age": age_text,
+                "current_balance": f"{round(wallet_metrics.balance_eth, 4)} ETH",
+                "total_transactions": wallet_metrics.tx_count,
+                "last_activity": last_activity_text,
+                "avg_daily_tx": round(wallet_metrics.avg_tx_per_day, 1),
+                "defi_protocols": ", ".join(defi_protocols) if defi_protocols else "None detected"
+            },
+            "identity_tags": identity_tags if identity_tags else ["No Verification"],
+            "risk_tags": risk_tags if risk_tags else ["Clean History"],
             "raw_metrics": {
                 "basic": {
                     "age_days": wallet_metrics.age_days,
                     "tx_count": wallet_metrics.tx_count,
                     "balance_eth": round(wallet_metrics.balance_eth, 4),
-                    "avg_tx_per_day": round(wallet_metrics.avg_tx_per_day, 2)
+                    "avg_tx_per_day": round(wallet_metrics.avg_tx_per_day, 2),
+                    "last_activity_days": wallet_metrics.last_activity_days
                 },
                 "defi": {
                     "protocols": wallet_metrics.defi_protocols,
                     "contracts": wallet_metrics.unique_contracts,
-                    "nft_collections": wallet_metrics.nft_collections
+                    "nft_collections": wallet_metrics.nft_collections,
+                    "bridge_usage": wallet_metrics.bridge_usage
                 },
                 "identity": {
                     "has_ens": wallet_metrics.has_ens,
@@ -620,6 +701,12 @@ async def analyze_wallet(address: str) -> Dict:
                         wallet_metrics.has_lens,
                         wallet_metrics.has_twitter
                     ])
+                },
+                "risk": {
+                    "flagged_interactions": wallet_metrics.flagged_interactions,
+                    "blacklisted_interactions": wallet_metrics.blacklisted_interactions,
+                    "wash_trading_score": wallet_metrics.wash_trading_score,
+                    "suspicious_patterns": wallet_metrics.suspicious_patterns
                 }
             }
         }

@@ -113,7 +113,7 @@ async def lifespan(app: FastAPI):
     
     # Validate scoring module
     try:
-        from scoring import calculate_trust_score, get_wallet_data
+        from scoring import analyze_wallet
         logger.info("Scoring module loaded successfully")
     except ImportError as e:
         logger.error("Failed to import scoring module", error=str(e))
@@ -398,7 +398,7 @@ async def log_requests(request: Request, call_next):
 # API Routes
 @app.get("/", tags=["Root"])
 @limiter.limit(settings.rate_limit)
-async def read_root():
+async def read_root(request: Request):
     """Root endpoint with API information"""
     return {
         "name": "TrustLens.AI API",
@@ -409,86 +409,83 @@ async def read_root():
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
-@app.post(
-    "/api/v2/analyze",
-    response_model=WalletAnalysisResponse,
-    tags=["Analysis"],
-    summary="Analyze wallet trust score",
-    description="Perform comprehensive trust analysis on a blockchain wallet address"
-)
+@app.post("/api/v2/analyze", response_model=WalletAnalysisResponse, tags=["Analysis"])
 @limiter.limit(settings.rate_limit)
 async def analyze_wallet_v2(
     request: Request,
     wallet_request: WalletAnalysisRequest,
     background_tasks: BackgroundTasks,
-    redis_client: Optional[redis.Redis] = Depends(get_redis),
     authenticated: bool = Depends(verify_api_key)
 ):
-    """Enhanced wallet analysis with caching and background processing"""
+    """Enhanced wallet analysis endpoint with caching"""
     start_time = time.time()
-    
+    request_id = request.state.request_id
+
+    logger.info(
+        "Received wallet analysis request",
+        address=wallet_request.address,
+        blockchain=wallet_request.blockchain,
+        request_id=request_id
+    )
+
+    # Check cache first
+    cache_key = await get_cache_key(wallet_request.address, wallet_request.blockchain)
+    cached_result = await get_cached_analysis(cache_key)
+    if cached_result:
+        cached_result["cached"] = True
+        cached_result["processing_time_ms"] = round((time.time() - start_time) * 1000, 2)
+        logger.info("Returning cached analysis", address=wallet_request.address)
+        return WalletAnalysisResponse(**cached_result)
+
     try:
-        # Check cache first
-        cache_key = await get_cache_key(wallet_request.address, wallet_request.blockchain)
-        cached_result = await get_cached_analysis(cache_key)
-        
-        if cached_result:
-            logger.info("Returning cached analysis", address=wallet_request.address)
-            cached_result["cached"] = True
-            cached_result["processing_time_ms"] = round((time.time() - start_time) * 1000, 2)
-            return WalletAnalysisResponse(**cached_result)
-        
-        # Import scoring logic
-        from scoring import calculate_trust_score, get_wallet_data
-        
-        # Get wallet data with timeout
-        try:
-            wallet_data = await asyncio.wait_for(
-                get_wallet_data(wallet_request.address, wallet_request.blockchain),
-                timeout=settings.request_timeout
-            )
-        except asyncio.TimeoutError:
-            raise HTTPException(
-                status_code=status.HTTP_408_REQUEST_TIMEOUT,
-                detail="Wallet data retrieval timed out"
-            )
-        
-        # Calculate trust score
-        analysis = calculate_trust_score(wallet_data, wallet_request.blockchain)
-        
-        # Build response
+        from scoring import analyze_wallet
+
+        logger.info("Performing new analysis", address=wallet_request.address)
+
+        # Use asyncio.wait_for to enforce a timeout on the analysis
+        full_analysis = await asyncio.wait_for(
+            analyze_wallet(wallet_request.address),
+            timeout=settings.request_timeout
+        )
+        analysis = full_analysis['analysis']
         processing_time = round((time.time() - start_time) * 1000, 2)
-        
+
         response_data = WalletAnalysisResponse(
             address=wallet_request.address,
             blockchain=wallet_request.blockchain,
-            trust_score=analysis["score"],
-            risk_category=analysis["risk_category"],
-            risk_factors=[RiskFactor(**rf) for rf in analysis.get("risk_factors", [])],
-            explanation=analysis["explanation"],
-            metadata=WalletMetadata(**wallet_data) if wallet_request.include_metadata else None,
+            trust_score=analysis['score'],
+            risk_level=analysis['risk_level'].value if hasattr(analysis['risk_level'], 'value') else analysis['risk_level'],
+            risk_factors=[RiskFactor(**rf) for rf in analysis['risk_factors']],
+            explanation=analysis['explanation'],
+            metadata=WalletMetadata(**full_analysis.get("raw_metrics", {}).get("basic", {})),
             processing_time_ms=processing_time,
             cached=False,
-            confidence_score=analysis.get("confidence_score", 0.8)
+            confidence_score=analysis.get('confidence', 0.8)
         )
-        
+
         # Cache result in background
         background_tasks.add_task(
             cache_analysis,
             cache_key,
-            response_data,
+            response_data.model_dump(),
             settings.cache_ttl
         )
-        
+
         logger.info(
             "Wallet analysis completed",
             address=wallet_request.address,
             trust_score=analysis["score"],
             processing_time_ms=processing_time
         )
-        
+
         return response_data
-        
+
+    except asyncio.TimeoutError:
+        logger.error("Wallet analysis timed out", address=wallet_request.address)
+        raise HTTPException(
+            status_code=status.HTTP_408_REQUEST_TIMEOUT,
+            detail="Wallet analysis timed out"
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -526,7 +523,7 @@ async def analyze_wallet_legacy(
 
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 @limiter.limit("1000/minute")  # Higher limit for health checks
-async def health_check():
+async def health_check(request: Request):
     """Comprehensive health check endpoint"""
     start_time = time.time()
     
@@ -542,7 +539,7 @@ async def health_check():
     # Check scoring module
     scoring_available = False
     try:
-        from scoring import calculate_trust_score
+        from scoring import analyze_wallet
         scoring_available = True
     except ImportError:
         pass
