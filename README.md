@@ -1,5 +1,5 @@
 # TrustLens.AI 🔍
-[![HyperHack](https://img.shields.io/badge/HyperHack-2023-blueviolet)](https://hyperhack.devpost.com/)
+[![HyperHack](https://img.shields.io/badge/HyperHack-2025-blueviolet)](https://hyperhack.devpost.com/)
 
 **Advanced On-Chain Trust & Risk Analysis Platform**
 
