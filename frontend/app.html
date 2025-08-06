@@ -970,6 +970,7 @@
         </div>
     </main>
 
+    <script src="config.js"></script>
     <script type="module">
         // Theme Toggle
         const themeToggle = document.getElementById('themeToggle');
@@ -1364,7 +1365,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                const apiKey = 'YOUR_API_KEY_HERE'; // <-- IMPORTANT: Replace with your actual API key
+                const apiKey = window.API_KEY || ''; // Will be injected during build or from a secure source
                 console.log(`--- Sending API key from frontend: ${apiKey ? apiKey.substring(0, 4) + '...' : 'No API key'} ---`);
 
                 const response = await fetch('http://127.0.0.1:8000/api/v2/chat', {

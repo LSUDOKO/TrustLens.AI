@@ -15,9 +15,11 @@
 config.json
 secrets.json
 token.txt
+.env
+*.env
+config.js
 api_keys.txt
-
-# ==================== DISCORD BOT SPECIFIC ====================
+Untitled-*
 # Discord bot logs
 *.log
 discord.log
