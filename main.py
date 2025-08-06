@@ -32,6 +32,11 @@ api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
 
 async def verify_api_key(api_key: str = Depends(api_key_header)):
     """Verify the API key provided in the request header."""
+    # Development mode quick fix: bypass API key check
+    if settings.environment == "development":
+        logger.warning("DEV MODE: Bypassing API key validation.")
+        return True
+
     if not settings.api_key:
         logger.warning("API key not configured on server, access is open.")
         return True

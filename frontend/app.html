@@ -1364,11 +1364,14 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
+                const apiKey = 'YOUR_API_KEY_HERE'; // <-- IMPORTANT: Replace with your actual API key
+                console.log(`--- Sending API key from frontend: ${apiKey ? apiKey.substring(0, 4) + '...' : 'No API key'} ---`);
+
                 const response = await fetch('http://127.0.0.1:8000/api/v2/chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-API-KEY': 'YOUR_API_KEY_HERE' // <-- IMPORTANT: Replace with your actual API key
+                        'X-API-KEY': apiKey
                     },
                     body: JSON.stringify({ query: query }),
                 });

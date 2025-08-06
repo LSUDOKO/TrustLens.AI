@@ -16,8 +16,11 @@ class Settings:
         self.environment = os.getenv("ENVIRONMENT", "development")
         self.rate_limit = os.getenv("RATE_LIMIT", "10/minute")
         self.request_timeout = int(os.getenv("REQUEST_TIMEOUT", "30"))
-        self.api_key = os.getenv("API_KEY")
+        self.api_key = os.getenv("API_KEY", "").strip()
         self.cache_ttl = int(os.getenv("CACHE_TTL", "3600")) # Cache for 1 hour by default
 
 # Create a single, global instance of the settings
 settings = Settings()
+
+# Debugging: Print loaded API key to verify it's loaded correctly
+print(f"--- Loaded API key from .env: {settings.api_key[:4]}... ---" if settings.api_key else "--- No API key loaded from .env ---")
