@@ -16,5 +16,8 @@ alith==0.5.1
 redis
 requests
 
+# --- API Utilities ---
+slowapi
+
 # --- Data Models ---
 pydantic

@@ -14,6 +14,10 @@ class Settings:
         self.enable_ai_analysis = os.getenv("ENABLE_AI_ANALYSIS", "true").lower() == "true"
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         self.environment = os.getenv("ENVIRONMENT", "development")
+        self.rate_limit = os.getenv("RATE_LIMIT", "10/minute")
+        self.request_timeout = int(os.getenv("REQUEST_TIMEOUT", "30"))
+        self.api_key = os.getenv("API_KEY")
+        self.cache_ttl = int(os.getenv("CACHE_TTL", "3600")) # Cache for 1 hour by default
 
 # Create a single, global instance of the settings
 settings = Settings()
