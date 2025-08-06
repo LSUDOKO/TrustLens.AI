@@ -105,12 +105,41 @@ def create_agent() -> Optional[Agent]:
         logger.warning("⚠️ ETHERSCAN_API_KEY not found. Wallet analysis will be limited.")
     
     try:
-        # Initialize Agent with required parameters
-        agent = Agent(
-            model="gemini-pro",
-            tools=[get_wallet_analysis_tool],
-            api_key=settings.gemini_api_key,
-        )
+        # Debug: Check what's available in the Agent class
+        logger.info("Attempting to create Alith Agent...")
+        
+        # Try to import and inspect Alith to understand supported models
+        from alith import Agent
+        logger.info(f"Alith Agent class available: {Agent}")
+        
+        # Initialize Agent with correct model name for Alith
+        # Based on Alith documentation, try common model names
+        model_names_to_try = [
+            "deepseek-chat",
+            "gpt-4", 
+            "gpt-3.5-turbo",
+            "claude-3-sonnet",
+            "gemini-pro",
+            "gemini"
+        ]
+        
+        agent = None
+        for model_name in model_names_to_try:
+            try:
+                logger.info(f"Trying model: {model_name}")
+                agent = Agent(
+                    model=model_name,
+                    tools=[get_wallet_analysis_tool],
+                    api_key=settings.gemini_api_key,
+                )
+                logger.info(f"✅ Successfully created agent with model: {model_name}")
+                break
+            except Exception as model_error:
+                logger.warning(f"Failed with model {model_name}: {model_error}")
+                continue
+        
+        if not agent:
+            raise Exception("Failed to create agent with any supported model")
         
         logger.info("✅ TrustLens AI Agent (Gemini-powered) initialized successfully.")
         return agent
