@@ -1,66 +1,114 @@
 import asyncio
 import aiohttp
-import logging
-import os
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
-import json
+import time
+from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
-import numpy as np
+from datetime import datetime, timezone
+import logging
 
 # Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @dataclass
-class BlockchainTransaction:
+class Transaction:
+    """Data class representing a blockchain transaction"""
     hash: str
+    block_number: int
+    timestamp: datetime
     from_address: str
     to_address: str
-    value: float
-    timestamp: int
+    value: float  # in ETH
     gas_used: int
     gas_price: int
-    is_contract_creation: bool = False
-    contract_address: Optional[str] = None
+    input_data: str
+    is_error: bool = False
+    
+    @classmethod
+    def from_etherscan_data(cls, data: Dict[str, Any]) -> 'Transaction':
+        """Create Transaction from Etherscan API response"""
+        return cls(
+            hash=data.get('hash', ''),
+            block_number=int(data.get('blockNumber', 0)),
+            timestamp=datetime.fromtimestamp(int(data.get('timeStamp', 0)), timezone.utc),
+            from_address=data.get('from', ''),
+            to_address=data.get('to', ''),
+            value=float(data.get('value', 0)) / 1e18,  # Convert wei to ETH
+            gas_used=int(data.get('gasUsed', 0)),
+            gas_price=int(data.get('gasPrice', 0)),
+            input_data=data.get('input', ''),
+            is_error=data.get('isError', '0') == '1'
+        )
 
 class EtherscanAPI:
-    """Real Etherscan API integration for blockchain data"""
+    """Ethereum blockchain data provider using Etherscan API"""
     
     def __init__(self, api_key: str):
         self.api_key = api_key
         self.base_url = "https://api.etherscan.io/api"
-        self.session = None
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.rate_limit_delay = 0.2  # 5 requests per second limit
+        self.last_request_time = 0
         
     async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
+        """Async context manager entry"""
+        self.session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=30),
+            headers={
+                'User-Agent': 'TrustLens.AI/1.0'
+            }
+        )
         return self
         
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
         if self.session:
             await self.session.close()
     
-    async def _make_request(self, params: Dict) -> Dict:
-        """Make API request to Etherscan"""
+    async def _rate_limit(self):
+        """Implement rate limiting to respect API limits"""
+        current_time = time.time()
+        time_since_last = current_time - self.last_request_time
+        
+        if time_since_last < self.rate_limit_delay:
+            await asyncio.sleep(self.rate_limit_delay - time_since_last)
+        
+        self.last_request_time = time.time()
+    
+    async def _make_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Make a request to Etherscan API with rate limiting and error handling"""
+        await self._rate_limit()
+        
+        # Add API key to params
         params['apikey'] = self.api_key
+        
+        if not self.session:
+            raise RuntimeError("API session not initialized. Use async context manager.")
         
         try:
             async with self.session.get(self.base_url, params=params) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    if data.get('status') == '1':
-                        return data.get('result', {})
-                    else:
-                        logger.warning(f"Etherscan API error: {data.get('message')}")
-                        return {}
-                else:
-                    logger.error(f"HTTP error {response.status}")
-                    return {}
+                if response.status != 200:
+                    raise Exception(f"HTTP {response.status}: {await response.text()}")
+                
+                data = await response.json()
+                
+                if data.get('status') != '1':
+                    error_msg = data.get('message', 'Unknown error')
+                    if error_msg == 'No transactions found':
+                        # This is not an error, just empty result
+                        return {'status': '1', 'result': []}
+                    raise Exception(f"API Error: {error_msg}")
+                
+                return data
+                
+        except aiohttp.ClientError as e:
+            raise Exception(f"Network error: {str(e)}")
         except Exception as e:
-            logger.error(f"Request failed: {e}")
-            return {}
+            logger.error(f"Request failed: {str(e)}")
+            raise
     
     async def get_account_balance(self, address: str) -> float:
-        """Get ETH balance for address"""
+        """Get the current ETH balance of an address"""
         params = {
             'module': 'account',
             'action': 'balance',
@@ -68,300 +116,245 @@ class EtherscanAPI:
             'tag': 'latest'
         }
         
-        result = await self._make_request(params)
-        if result:
-            # Convert from wei to ETH
-            return float(result) / 10**18
-        return 0.0
+        try:
+            data = await self._make_request(params)
+            balance_wei = int(data['result'])
+            balance_eth = balance_wei / 1e18
+            
+            logger.info(f"Balance for {address}: {balance_eth:.6f} ETH")
+            return balance_eth
+            
+        except Exception as e:
+            logger.error(f"Failed to get balance for {address}: {str(e)}")
+            raise
     
-    async def get_transaction_list(self, address: str, limit: int = 10000) -> List[BlockchainTransaction]:
-        """Get transaction history for address"""
+    async def get_transaction_list(self, address: str, limit: int = 100, 
+                                   start_block: int = 0, end_block: int = 99999999) -> List[Transaction]:
+        """Get list of transactions for an address"""
         params = {
             'module': 'account',
             'action': 'txlist',
             'address': address,
-            'startblock': 0,
-            'endblock': 99999999,
+            'startblock': start_block,
+            'endblock': end_block,
             'page': 1,
-            'offset': limit,
-            'sort': 'desc'
+            'offset': min(limit, 10000),  # Etherscan max is 10,000
+            'sort': 'desc'  # Most recent first
         }
         
-        result = await self._make_request(params)
-        transactions = []
-        
-        if result and isinstance(result, list):
-            for tx in result:
+        try:
+            data = await self._make_request(params)
+            transactions = []
+            
+            for tx_data in data.get('result', []):
                 try:
-                    transactions.append(BlockchainTransaction(
-                        hash=tx.get('hash', ''),
-                        from_address=tx.get('from', ''),
-                        to_address=tx.get('to', ''),
-                        value=float(tx.get('value', '0')) / 10**18,  # Convert wei to ETH
-                        timestamp=int(tx.get('timeStamp', '0')),
-                        gas_used=int(tx.get('gasUsed', '0')),
-                        gas_price=int(tx.get('gasPrice', '0')),
-                        is_contract_creation=tx.get('to', '') == '',
-                        contract_address=tx.get('contractAddress')
-                    ))
-                except (ValueError, TypeError) as e:
-                    logger.warning(f"Error parsing transaction: {e}")
+                    tx = Transaction.from_etherscan_data(tx_data)
+                    transactions.append(tx)
+                except Exception as e:
+                    logger.warning(f"Failed to parse transaction {tx_data.get('hash', 'unknown')}: {str(e)}")
                     continue
-        
-        return transactions
+            
+            logger.info(f"Retrieved {len(transactions)} transactions for {address}")
+            return transactions
+            
+        except Exception as e:
+            logger.error(f"Failed to get transactions for {address}: {str(e)}")
+            raise
     
-    async def get_internal_transactions(self, address: str, limit: int = 1000) -> List[Dict]:
-        """Get internal transactions for address"""
+    async def get_internal_transactions(self, address: str, limit: int = 100) -> List[Transaction]:
+        """Get internal transactions (contract interactions)"""
         params = {
             'module': 'account',
             'action': 'txlistinternal',
             'address': address,
-            'startblock': 0,
-            'endblock': 99999999,
             'page': 1,
-            'offset': limit,
+            'offset': min(limit, 10000),
             'sort': 'desc'
         }
         
-        result = await self._make_request(params)
-        return result if isinstance(result, list) else []
+        try:
+            data = await self._make_request(params)
+            transactions = []
+            
+            for tx_data in data.get('result', []):
+                try:
+                    tx = Transaction.from_etherscan_data(tx_data)
+                    transactions.append(tx)
+                except Exception as e:
+                    logger.warning(f"Failed to parse internal transaction: {str(e)}")
+                    continue
+            
+            logger.info(f"Retrieved {len(transactions)} internal transactions for {address}")
+            return transactions
+            
+        except Exception as e:
+            logger.error(f"Failed to get internal transactions for {address}: {str(e)}")
+            # Don't raise for internal transactions - they're optional
+            return []
     
-    async def get_erc20_transfers(self, address: str, limit: int = 1000) -> List[Dict]:
-        """Get ERC20 token transfers for address"""
+    async def get_erc20_transfers(self, address: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get ERC-20 token transfers"""
         params = {
             'module': 'account',
             'action': 'tokentx',
             'address': address,
-            'startblock': 0,
-            'endblock': 99999999,
             'page': 1,
-            'offset': limit,
+            'offset': min(limit, 10000),
             'sort': 'desc'
         }
         
-        result = await self._make_request(params)
-        return result if isinstance(result, list) else []
+        try:
+            data = await self._make_request(params)
+            transfers = data.get('result', [])
+            
+            logger.info(f"Retrieved {len(transfers)} ERC-20 transfers for {address}")
+            return transfers
+            
+        except Exception as e:
+            logger.error(f"Failed to get ERC-20 transfers for {address}: {str(e)}")
+            # Don't raise for token transfers - they're optional
+            return []
     
-    async def get_contract_info(self, address: str) -> Dict:
-        """Check if address is a contract and get ABI if available"""
+    async def get_contract_info(self, address: str) -> Optional[Dict[str, Any]]:
+        """Check if address is a contract and get basic info"""
         params = {
             'module': 'contract',
-            'action': 'getabi',
+            'action': 'getsourcecode',
             'address': address
         }
         
-        result = await self._make_request(params)
-        return {'is_contract': bool(result), 'abi': result if result else None}
+        try:
+            data = await self._make_request(params)
+            result = data.get('result', [])
+            
+            if result and result[0].get('SourceCode'):
+                return {
+                    'is_contract': True,
+                    'name': result[0].get('ContractName', ''),
+                    'compiler': result[0].get('CompilerVersion', ''),
+                    'verified': True
+                }
+            else:
+                # Check if it's an unverified contract by looking at code
+                code_params = {
+                    'module': 'proxy',
+                    'action': 'eth_getCode',
+                    'address': address,
+                    'tag': 'latest'
+                }
+                
+                code_data = await self._make_request(code_params)
+                code = code_data.get('result', '0x')
+                
+                return {
+                    'is_contract': code != '0x' and len(code) > 2,
+                    'name': '',
+                    'compiler': '',
+                    'verified': False
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to get contract info for {address}: {str(e)}")
+            return None
 
-class BlockchainAnalyzer:
-    """Analyze blockchain data for trust scoring"""
+# Utility functions
+async def validate_ethereum_address(address: str) -> bool:
+    """Validate if address is a valid Ethereum address"""
+    if not address or not isinstance(address, str):
+        return False
     
-    def __init__(self, etherscan_api: EtherscanAPI):
-        self.etherscan = etherscan_api
+    # Remove 0x prefix if present
+    if address.startswith('0x'):
+        address = address[2:]
     
-    async def analyze_wallet_comprehensive(self, address: str) -> Dict:
-        """Comprehensive wallet analysis using real blockchain data"""
-        logger.info(f"Starting comprehensive analysis for {address[:8]}...")
+    # Check length (40 hex characters)
+    if len(address) != 40:
+        return False
+    
+    # Check if all characters are hex
+    try:
+        int(address, 16)
+        return True
+    except ValueError:
+        return False
+
+async def get_address_summary(api_key: str, address: str) -> Dict[str, Any]:
+    """Get a comprehensive summary of an address"""
+    if not await validate_ethereum_address(address):
+        raise ValueError(f"Invalid Ethereum address: {address}")
+    
+    async with EtherscanAPI(api_key) as etherscan:
+        # Get basic data
+        balance = await etherscan.get_account_balance(address)
+        transactions = await etherscan.get_transaction_list(address, limit=50)
         
-        # Fetch all data in parallel
-        tasks = [
-            self.etherscan.get_account_balance(address),
-            self.etherscan.get_transaction_list(address),
-            self.etherscan.get_internal_transactions(address),
-            self.etherscan.get_erc20_transfers(address),
-            self.etherscan.get_contract_info(address)
-        ]
+        # Optional data (don't fail if these don't work)
+        internal_txs = []
+        erc20_transfers = []
+        contract_info = None
         
         try:
-            balance, transactions, internal_txs, token_transfers, contract_info = await asyncio.gather(*tasks)
-        except Exception as e:
-            logger.error(f"Error fetching data for {address}: {e}")
-            return self._fallback_analysis(address)
+            internal_txs = await etherscan.get_internal_transactions(address, limit=50)
+        except:
+            pass
         
-        # Analyze the fetched data
-        analysis = await self._analyze_data(address, balance, transactions, internal_txs, token_transfers, contract_info)
+        try:
+            erc20_transfers = await etherscan.get_erc20_transfers(address, limit=50)
+        except:
+            pass
         
-        logger.info(f"Completed analysis for {address[:8]}")
-        return analysis
-    
-    async def _analyze_data(self, address: str, balance: float, transactions: List[BlockchainTransaction], 
-                          internal_txs: List[Dict], token_transfers: List[Dict], contract_info: Dict) -> Dict:
-        """Analyze fetched blockchain data"""
-        
-        current_time = datetime.now().timestamp()
-        
-        # Basic metrics
-        tx_count = len(transactions)
-        
-        # Calculate wallet age
-        if transactions:
-            first_tx_time = min(tx.timestamp for tx in transactions)
-            age_days = int((current_time - first_tx_time) / (24 * 3600))
-            last_activity_days = int((current_time - max(tx.timestamp for tx in transactions)) / (24 * 3600))
-        else:
-            age_days = 0
-            last_activity_days = 999
-        
-        # Transaction patterns
-        total_volume = sum(tx.value for tx in transactions)
-        avg_tx_value = total_volume / max(1, tx_count)
-        max_tx_value = max((tx.value for tx in transactions), default=0)
-        avg_tx_per_day = tx_count / max(1, age_days) if age_days > 0 else 0
-        
-        # Contract interactions
-        contract_interactions = sum(1 for tx in transactions if tx.to_address and await self._is_contract_address(tx.to_address))
-        unique_contracts = len(set(tx.to_address for tx in transactions if tx.to_address and await self._is_contract_address(tx.to_address)))
-        
-        # DeFi analysis
-        defi_protocols = await self._analyze_defi_interactions(transactions)
-        
-        # Risk indicators
-        risk_analysis = await self._analyze_risk_patterns(transactions, internal_txs)
-        
-        # Gas efficiency
-        gas_efficiency = self._calculate_gas_efficiency(transactions)
+        try:
+            contract_info = await etherscan.get_contract_info(address)
+        except:
+            pass
         
         return {
             'address': address,
-            'balance_eth': balance,
-            'tx_count': tx_count,
-            'age_days': age_days,
-            'last_activity_days': last_activity_days,
-            'total_volume_eth': total_volume,
-            'avg_tx_value': avg_tx_value,
-            'max_tx_value': max_tx_value,
-            'avg_tx_per_day': avg_tx_per_day,
-            'contract_interactions': contract_interactions,
-            'unique_contracts': unique_contracts,
-            'defi_protocols': len(defi_protocols),
-            'defi_protocol_names': defi_protocols,
-            'gas_efficiency_score': gas_efficiency,
-            'is_contract': contract_info.get('is_contract', False),
-            'token_transfers': len(token_transfers),
-            'internal_transactions': len(internal_txs),
-            **risk_analysis
-        }
-    
-    async def _is_contract_address(self, address: str) -> bool:
-        """Check if address is a smart contract (simplified check)"""
-        # This is a simplified check - in production, you'd want to cache this
-        # or use a more efficient method
-        return len(address) == 42 and address.startswith('0x')
-    
-    async def _analyze_defi_interactions(self, transactions: List[BlockchainTransaction]) -> List[str]:
-        """Analyze DeFi protocol interactions"""
-        # Known DeFi contract addresses (simplified list)
-        defi_contracts = {
-            '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2',
-            '0xe592427a0aece92de3edee1f18e0157c05861564': 'Uniswap V3',
-            '0x7d2768de32b0b80b7a3454c06bdac94a69ddc7a9': 'Aave',
-            '0x3d9819210a31b4961b30ef54be2aed79b9c9cd3b': 'Compound',
-            '0x6b175474e89094c44da98b954eedeac495271d0f': 'DAI',
-            '0xa0b86a33e6d01547e04eb0606f2e1deb9dbce9a': 'USDC'
-        }
-        
-        protocols = set()
-        for tx in transactions:
-            if tx.to_address and tx.to_address.lower() in defi_contracts:
-                protocols.add(defi_contracts[tx.to_address.lower()])
-        
-        return list(protocols)
-    
-    async def _analyze_risk_patterns(self, transactions: List[BlockchainTransaction], internal_txs: List[Dict]) -> Dict:
-        """Analyze risk patterns in transactions"""
-        
-        # Analyze transaction patterns for suspicious activity
-        flagged_interactions = 0
-        suspicious_patterns = []
-        
-        # Check for rapid successive transactions (potential bot activity)
-        if len(transactions) > 10:
-            time_diffs = []
-            for i in range(1, min(100, len(transactions))):
-                time_diff = abs(transactions[i-1].timestamp - transactions[i].timestamp)
-                time_diffs.append(time_diff)
-            
-            avg_time_diff = sum(time_diffs) / len(time_diffs)
-            if avg_time_diff < 60:  # Less than 1 minute average
-                suspicious_patterns.append("rapid_transactions")
-        
-        # Check for circular transactions (simplified)
-        addresses = set()
-        for tx in transactions[:100]:  # Check recent transactions
-            addresses.add(tx.from_address)
-            addresses.add(tx.to_address)
-        
-        if len(addresses) < len(transactions) * 0.1:  # Very few unique addresses
-            suspicious_patterns.append("limited_counterparties")
-        
-        # Check for dust attacks (many small transactions)
-        dust_threshold = 0.001  # 0.001 ETH
-        dust_transactions = sum(1 for tx in transactions if 0 < tx.value < dust_threshold)
-        if dust_transactions > len(transactions) * 0.3:
-            suspicious_patterns.append("dust_pattern")
-        
-        return {
-            'flagged_interactions': flagged_interactions,
-            'blacklisted_interactions': 0,  # Would need blacklist database
-            'wash_trading_score': min(1.0, len(suspicious_patterns) * 0.3),
-            'suspicious_patterns': suspicious_patterns,
-            'mev_involvement': 0.0,  # Would need MEV detection
-            'sandwich_attacks': 0
-        }
-    
-    def _calculate_gas_efficiency(self, transactions: List[BlockchainTransaction]) -> float:
-        """Calculate gas efficiency score"""
-        if not transactions:
-            return 0.0
-        
-        # Calculate average gas price relative to network average (simplified)
-        avg_gas_price = sum(tx.gas_price for tx in transactions) / len(transactions)
-        
-        # Normalize to 0-1 scale (this is simplified - would need historical network data)
-        # Lower gas prices = higher efficiency
-        efficiency = max(0, min(1, 1 - (avg_gas_price / 50_000_000_000)))  # 50 gwei baseline
-        
-        return efficiency
-    
-    def _fallback_analysis(self, address: str) -> Dict:
-        """Fallback analysis when API calls fail"""
-        logger.warning(f"Using fallback analysis for {address}")
-        
-        # Return simulated data as fallback
-        return {
-            'address': address,
-            'balance_eth': np.random.exponential(2.0),
-            'tx_count': np.random.poisson(100) + 1,
-            'age_days': np.random.randint(30, 1500),
-            'last_activity_days': np.random.randint(0, 30),
-            'total_volume_eth': np.random.exponential(10.0),
-            'avg_tx_value': np.random.exponential(0.5),
-            'max_tx_value': np.random.exponential(5.0),
-            'avg_tx_per_day': np.random.uniform(0.1, 10.0),
-            'contract_interactions': np.random.poisson(25),
-            'unique_contracts': np.random.poisson(15),
-            'defi_protocols': np.random.poisson(8),
-            'defi_protocol_names': ['Uniswap', 'Aave', 'Compound'][:np.random.randint(1, 4)],
-            'gas_efficiency_score': np.random.beta(3, 2),
-            'is_contract': False,
-            'token_transfers': np.random.poisson(20),
-            'internal_transactions': np.random.poisson(5),
-            'flagged_interactions': np.random.poisson(0.5),
-            'blacklisted_interactions': np.random.poisson(0.1),
-            'wash_trading_score': np.random.beta(1, 4),
-            'suspicious_patterns': [],
-            'mev_involvement': 0.0,
-            'sandwich_attacks': 0
+            'balance': balance,
+            'transaction_count': len(transactions),
+            'transactions': transactions,
+            'internal_transactions': internal_txs,
+            'erc20_transfers': erc20_transfers,
+            'contract_info': contract_info,
+            'is_contract': contract_info.get('is_contract', False) if contract_info else False
         }
 
-# Factory function to create analyzer with API key from environment
-def create_blockchain_analyzer() -> Optional[BlockchainAnalyzer]:
-    """Create blockchain analyzer with API key from environment"""
+# Test function
+async def test_api():
+    """Test the API functionality"""
+    import os
+    from dotenv import load_dotenv
+    
+    load_dotenv()
     api_key = os.getenv('ETHERSCAN_API_KEY')
     
-    if not api_key or api_key == 'YOUR_ETHERSCAN_API_KEY_HERE':
-        logger.warning("No Etherscan API key found. Using simulated data.")
-        return None
+    if not api_key:
+        print("❌ No API key found in environment variables")
+        return
     
-    etherscan_api = EtherscanAPI(api_key)
-    return BlockchainAnalyzer(etherscan_api)
+    test_address = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"  # Vitalik's address
+    
+    try:
+        async with EtherscanAPI(api_key) as etherscan:
+            print(f"Testing API with address: {test_address}")
+            
+            # Test balance
+            balance = await etherscan.get_account_balance(test_address)
+            print(f"✅ Balance: {balance:.4f} ETH")
+            
+            # Test transactions
+            txs = await etherscan.get_transaction_list(test_address, limit=5)
+            print(f"✅ Transactions: {len(txs)} found")
+            
+            if txs:
+                latest = txs[0]
+                print(f"   Latest: {latest.hash[:10]}... ({latest.value:.4f} ETH)")
+                print(f"   Date: {latest.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            
+            print("🎉 API test successful!")
+            
+    except Exception as e:
+        print(f"❌ API test failed: {str(e)}")
+
+if __name__ == "__main__":
+    asyncio.run(test_api())

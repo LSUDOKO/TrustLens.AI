@@ -1,473 +1,501 @@
-import numpy as np
-from collections import defaultdict
-import time
-from decimal import Decimal
+#!/usr/bin/env python3
+"""
+Enhanced scoring system with real blockchain API integration
+"""
+
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-import aiofiles
-from contextlib import asynccontextmanager
-import statistics
+import logging
+from dataclasses import dataclass
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
+import json
 
-# Import blockchain API components
-from blockchain_api import create_blockchain_analyzer, EtherscanAPI, BlockchainAnalyzer
+from .blockchain_api import EtherscanAPI
 
-# ... (rest of the code remains the same)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Legacy compatibility - Simple wallet data aggregator for backward compatibility
-class WalletDataAggregator:
-    """Simple wallet data aggregator for backward compatibility"""
+@dataclass
+class WalletMetrics:
+    """Data class to hold wallet metrics"""
+    address: str
+    current_balance: float
+    total_transactions: int
+    wallet_age: int  # in days
+    average_transaction_value: float
+    max_transaction_value: float
+    unique_counterparties: int
+    gas_efficiency_score: float
+    activity_frequency: float  # transactions per day
+    last_activity_days: int
+    incoming_volume: float
+    outgoing_volume: float
+    net_flow: float
+    contract_interactions: int
+    failed_transactions: int
+    data_source: str  # 'real' or 'simulated'
     
-    def __init__(self):
-        self.rate_limits = {}
-        self.blockchain_analyzer = create_blockchain_analyzer()
-        self.use_real_data = self.blockchain_analyzer is not None
-        
-        if self.use_real_data:
-            logger.info("✅ Real blockchain data enabled via Etherscan API")
-        else:
-            logger.info("⚠️  Using simulated data - add ETHERSCAN_API_KEY to .env for real data")
-    
-    async def aggregate_wallet_data(self, address: str) -> WalletMetrics:
-        """Aggregate comprehensive wallet data"""
-        logger.info(f"Aggregating data for wallet: {address[:8]}...")
-        
-        if self.use_real_data:
-            # Use real blockchain data
-            try:
-                async with self.blockchain_analyzer.etherscan:
-                    raw_data = await self.blockchain_analyzer.analyze_wallet_comprehensive(address)
-                
-                # Convert to WalletMetrics format
-                metrics = self._convert_to_wallet_metrics(raw_data)
-                logger.info(f"✅ Real data analysis completed for {address[:8]}")
-                return metrics
-                
-            except Exception as e:
-                logger.error(f"Real data analysis failed for {address}: {e}")
-                logger.info("Falling back to simulated data...")
-                return await self._get_simulated_data(address)
-        else:
-            # Use simulated data
-            return await self._get_simulated_data(address)
-    
-    async def _rate_limit_check(self, service: str):
-        """Simple rate limiting check"""
-        current_time = time.time()
-        
-        if service not in self.rate_limits:
-            self.rate_limits[service] = {'last_call': 0, 'call_count': 0}
-        
-        rate_info = self.rate_limits[service]
-        
-        # Reset call count every minute
-        if current_time - rate_info['last_call'] > 60:
-            rate_info['call_count'] = 0
-        
-        # Simple rate limiting: max 5 calls per minute per service
-        if rate_info['call_count'] >= 5:
-            sleep_time = 60 - (current_time - rate_info['last_call'])
-            if sleep_time > 0:
-                logger.info(f"Rate limiting {service}, sleeping for {sleep_time:.1f}s")
-                await asyncio.sleep(sleep_time)
-                rate_info['call_count'] = 0
-        
-        rate_info['last_call'] = current_time
-        rate_info['call_count'] += 1
-    
-    def _convert_to_wallet_metrics(self, raw_data: Dict) -> WalletMetrics:
-        """Convert blockchain API data to WalletMetrics"""
-        
-        # Extract identity verification data
-        identity_data = {
-            'has_ens': len(raw_data.get('defi_protocol_names', [])) > 0,  # Simplified
-            'ens_domains': 1 if len(raw_data.get('defi_protocol_names', [])) > 0 else 0,
-            'has_github': raw_data.get('contract_interactions', 0) > 50,  # Heuristic
-            'has_twitter': raw_data.get('unique_contracts', 0) > 10,  # Heuristic
-            'has_discord': False,  # Would need social verification API
-            'verified_human': raw_data.get('defi_protocols', 0) > 3  # Active DeFi user heuristic
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'address': self.address,
+            'current_balance': self.current_balance,
+            'total_transactions': self.total_transactions,
+            'wallet_age': self.wallet_age,
+            'average_transaction_value': self.average_transaction_value,
+            'max_transaction_value': self.max_transaction_value,
+            'unique_counterparties': self.unique_counterparties,
+            'gas_efficiency_score': self.gas_efficiency_score,
+            'activity_frequency': self.activity_frequency,
+            'last_activity_days': self.last_activity_days,
+            'incoming_volume': self.incoming_volume,
+            'outgoing_volume': self.outgoing_volume,
+            'net_flow': self.net_flow,
+            'contract_interactions': self.contract_interactions,
+            'failed_transactions': self.failed_transactions,
+            'data_source': self.data_source
         }
-        
-        # Calculate derived metrics
-        current_time = datetime.now().timestamp()
-        first_tx_timestamp = current_time - (raw_data.get('age_days', 0) * 24 * 3600)
-        last_tx_timestamp = current_time - (raw_data.get('last_activity_days', 0) * 24 * 3600)
-        
-        return WalletMetrics(
-            address=raw_data.get('address', ''),
-            balance_eth=raw_data.get('balance_eth', 0.0),
-            tx_count=raw_data.get('tx_count', 0),
-            age_days=raw_data.get('age_days', 0),
-            first_tx_timestamp=first_tx_timestamp,
-            last_tx_timestamp=last_tx_timestamp,
-            avg_tx_per_day=raw_data.get('avg_tx_per_day', 0.0),
-            total_volume_eth=raw_data.get('total_volume_eth', 0.0),
-            avg_tx_value=raw_data.get('avg_tx_value', 0.0),
-            max_tx_value=raw_data.get('max_tx_value', 0.0),
-            unique_contracts=raw_data.get('unique_contracts', 0) + 10,  # Estimate
-            contract_interactions=raw_data.get('contract_interactions', 0),
-            defi_protocols=raw_data.get('defi_protocols', 0),
-            nft_collections=0,  # Would need NFT API
-            token_diversity_score=raw_data.get('token_transfers', 0),
-            gas_efficiency_score=raw_data.get('gas_efficiency_score', 0.5),
-            
-            # Identity data
-            has_ens=identity_data['has_ens'],
-            ens_domains=identity_data['ens_domains'],
-            has_github=identity_data['has_github'],
-            has_twitter=identity_data['has_twitter'],
-            verified_credentials=sum([identity_data['has_ens'], identity_data['has_github'], identity_data['has_twitter']]),
-            
-            # Risk indicators from real analysis
-            flagged_interactions=raw_data.get('flagged_interactions', 0),
-            blacklisted_interactions=raw_data.get('blacklisted_interactions', 0),
-            wash_trading_score=raw_data.get('wash_trading_score', 0.0),
-            mev_involvement=raw_data.get('mev_involvement', 0.0),
-            sandwich_attacks=raw_data.get('sandwich_attacks', 0),
-            
-            # Network data
-            clustering_coefficient=0.1,  # Would need graph analysis
-            betweenness_centrality=min(raw_data.get('defi_protocols', 0) / 10.0, 1.0),
-            
-            # Additional metrics
-            is_contract=raw_data.get('is_contract', False),
-            contract_creation_timestamp=first_tx_timestamp if not raw_data.get('is_contract', False) else current_time,
-            
-            # Metadata
-            data_freshness=1.0,  # Real data is always fresh
-            confidence_score=0.95,  # High confidence for real data
-            api_sources_used=['etherscan']
-        )
-    
-    async def _get_simulated_data(self, address: str) -> WalletMetrics:
-        """Generate simulated wallet data for demo purposes"""
-        logger.info(f"Using simulated data for {address[:8]}")
-        
-        # Generate realistic simulated data
-        current_time = datetime.now().timestamp()
-        age_days = np.random.randint(30, 1500)
-        first_tx_timestamp = current_time - (age_days * 24 * 3600)
-        last_activity_days = np.random.randint(0, 30)
-        last_tx_timestamp = current_time - (last_activity_days * 24 * 3600)
-        
-        tx_count = np.random.poisson(100) + 1
-        balance_eth = np.random.exponential(2.0)
-        
-        # Identity data simulation
-        has_ens = np.random.random() < 0.3
-        ens_domains = np.random.poisson(1) if has_ens else 0
-        has_github = np.random.random() < 0.15
-        has_twitter = np.random.random() < 0.12
-        has_farcaster = np.random.random() < 0.1
-        has_lens = np.random.random() < 0.08
-        
-        # Risk indicators
-        flagged_interactions = np.random.poisson(0.5)
-        blacklisted_interactions = np.random.poisson(0.1)
-        wash_trading_score = np.random.beta(1, 4)
-        mev_involvement = np.random.beta(1, 9)
-        sandwich_attacks = np.random.poisson(0.1)
-        
-        # Network data
-        clustering_coefficient = np.random.beta(2, 5)
-        betweenness_centrality = np.random.exponential(0.001)
-        connected_known_addresses = np.random.poisson(5)
-        
-        return WalletMetrics(
-            address=address,
-            tx_count=tx_count,
-            age_days=age_days,
-            balance_eth=balance_eth,
-            balance_usd=balance_eth * 2000,  # Approximate ETH price
-            first_tx_timestamp=first_tx_timestamp,
-            last_tx_timestamp=last_tx_timestamp,
-            last_activity_days=last_activity_days,
-            avg_tx_per_day=tx_count / max(1, age_days),
-            total_volume_eth=np.random.exponential(10.0),
-            avg_tx_value=np.random.exponential(0.5),
-            max_tx_value=np.random.exponential(5.0),
-            unique_contracts=np.random.poisson(15),
-            contract_interactions=np.random.poisson(25),
-            defi_protocols=np.random.poisson(8),
-            nft_collections=np.random.poisson(5),
-            bridge_usage=np.random.poisson(3),
-            token_diversity_score=np.random.beta(3, 2),
-            gas_efficiency_score=np.random.beta(3, 2),
-            
-            # Identity data
-            has_ens=has_ens,
-            ens_domains=ens_domains,
-            has_github=has_github,
-            has_twitter=has_twitter,
-            has_farcaster=has_farcaster,
-            has_lens=has_lens,
-            verified_credentials=sum([has_ens, has_github, has_twitter, has_farcaster, has_lens]),
-            
-            # Risk indicators
-            flagged_interactions=flagged_interactions,
-            blacklisted_interactions=blacklisted_interactions,
-            wash_trading_score=wash_trading_score,
-            mev_involvement=mev_involvement,
-            sandwich_attacks=sandwich_attacks,
-            flashloan_usage=np.random.poisson(1),
-            
-            # Network analysis
-            clustering_coefficient=clustering_coefficient,
-            betweenness_centrality=betweenness_centrality,
-            connected_known_addresses=connected_known_addresses,
-            suspicious_patterns=np.random.choice(
-                ["circular_transfers", "dust_attacks", "rapid_creation", "bot_like"], 
-                size=np.random.randint(0, 3), 
-                replace=False
-            ).tolist(),
-            
-            # Reputation scores (simulated)
-            chainalysis_score=np.random.beta(7, 3) * 100 if np.random.random() < 0.7 else None,
-            elliptic_score=np.random.beta(7, 3) * 100 if np.random.random() < 0.6 else None,
-            crystal_score=np.random.beta(7, 3) * 100 if np.random.random() < 0.5 else None,
-            
-            # Metadata
-            data_freshness=0.8,  # Simulated data has lower freshness
-            confidence_score=0.6,   # Lower confidence for simulated data
-            api_sources_used=['simulated']
-        )
 
-
-# Enhanced classes for comprehensive analysis
-class EnhancedWalletDataAggregator:
-    """Enhanced wallet data aggregator with multiple API sources"""
+class WalletDataAggregator:
+    """Aggregates wallet data from various blockchain sources"""
     
-    def __init__(self):
-        self.blockchain_analyzer = None
-        self.session = None
-        self.use_real_data = bool(os.getenv('ETHERSCAN_API_KEY'))
+    def __init__(self, etherscan_api: EtherscanAPI):
+        self.etherscan = etherscan_api
         
-    async def __aenter__(self):
-        self.session = aiohttp.ClientSession()
-        if self.use_real_data:
-            self.blockchain_analyzer = create_blockchain_analyzer()
-        return self
-        
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.session:
-            await self.session.close()
-        if self.blockchain_analyzer:
-            await self.blockchain_analyzer.cleanup()
-    
-    async def cleanup(self):
-        """Cleanup resources"""
-        if self.session and not self.session.closed:
-            await self.session.close()
-        if self.blockchain_analyzer:
-            await self.blockchain_analyzer.cleanup()
-    
     async def aggregate_wallet_data(self, address: str) -> WalletMetrics:
-        """Aggregate comprehensive wallet data"""
-        logger.info(f"Aggregating data for {address[:8]}...")
-        
-        if self.use_real_data and self.blockchain_analyzer:
-            try:
-                # Get real blockchain data
-                raw_data = await self.blockchain_analyzer.analyze_wallet_comprehensive(address)
-                metrics = self._convert_to_wallet_metrics(address, raw_data)
-                metrics.api_sources_used = ['etherscan']
-                metrics.data_freshness = 1.0
-                logger.info(f"✅ Real data aggregated for {address[:8]}")
-                return metrics
-            except Exception as e:
-                logger.warning(f"Real data failed for {address[:8]}: {e}, falling back to simulated")
-        
-        # Fallback to simulated data
-        return await self._get_simulated_data(address)
+        """
+        Aggregate comprehensive wallet data from blockchain APIs
+        """
+        try:
+            logger.info(f"Aggregating data for wallet: {address}")
+            
+            # Fetch basic account info
+            balance = await self.etherscan.get_account_balance(address)
+            transactions = await self.etherscan.get_transaction_list(address, limit=1000)
+            
+            logger.info(f"Fetched {len(transactions)} transactions for {address}")
+            
+            if not transactions:
+                # Return minimal metrics for empty wallet
+                return WalletMetrics(
+                    address=address,
+                    current_balance=balance,
+                    total_transactions=0,
+                    wallet_age=0,
+                    average_transaction_value=0.0,
+                    max_transaction_value=0.0,
+                    unique_counterparties=0,
+                    gas_efficiency_score=0.0,
+                    activity_frequency=0.0,
+                    last_activity_days=999999,
+                    incoming_volume=0.0,
+                    outgoing_volume=0.0,
+                    net_flow=0.0,
+                    contract_interactions=0,
+                    failed_transactions=0,
+                    data_source='real'
+                )
+            
+            # Calculate metrics
+            now = datetime.now(timezone.utc)
+            
+            # Transaction values and volumes
+            transaction_values = []
+            incoming_volume = 0.0
+            outgoing_volume = 0.0
+            counterparties = set()
+            contract_interactions = 0
+            failed_transactions = 0
+            
+            # Gas metrics
+            total_gas_used = 0
+            total_gas_price = 0
+            gas_transactions = 0
+            
+            # Timestamps for age and activity calculation
+            timestamps = []
+            
+            for tx in transactions:
+                # Transaction value
+                if tx.value > 0:
+                    transaction_values.append(tx.value)
+                
+                # Volume calculation (incoming vs outgoing)
+                if tx.to_address.lower() == address.lower():
+                    incoming_volume += tx.value
+                else:
+                    outgoing_volume += tx.value
+                
+                # Unique counterparties
+                if tx.from_address.lower() != address.lower():
+                    counterparties.add(tx.from_address.lower())
+                if tx.to_address.lower() != address.lower():
+                    counterparties.add(tx.to_address.lower())
+                
+                # Contract interactions (transactions with contract addresses)
+                if tx.input_data and tx.input_data != '0x':
+                    contract_interactions += 1
+                
+                # Failed transactions
+                if hasattr(tx, 'is_error') and tx.is_error:
+                    failed_transactions += 1
+                
+                # Gas efficiency
+                if tx.gas_used > 0 and tx.gas_price > 0:
+                    total_gas_used += tx.gas_used
+                    total_gas_price += tx.gas_price
+                    gas_transactions += 1
+                
+                # Timestamps
+                timestamps.append(tx.timestamp)
+            
+            # Calculate derived metrics
+            total_transactions = len(transactions)
+            
+            # Wallet age (days since first transaction)
+            if timestamps:
+                oldest_timestamp = min(timestamps)
+                newest_timestamp = max(timestamps)
+                wallet_age = (now - oldest_timestamp).days
+                last_activity_days = (now - newest_timestamp).days
+            else:
+                wallet_age = 0
+                last_activity_days = 999999
+            
+            # Average and max transaction values
+            if transaction_values:
+                average_transaction_value = sum(transaction_values) / len(transaction_values)
+                max_transaction_value = max(transaction_values)
+            else:
+                average_transaction_value = 0.0
+                max_transaction_value = 0.0
+            
+            # Activity frequency (transactions per day)
+            if wallet_age > 0:
+                activity_frequency = total_transactions / wallet_age
+            else:
+                activity_frequency = 0.0
+            
+            # Gas efficiency score (lower is better, normalized to 0-100)
+            if gas_transactions > 0:
+                avg_gas_price = total_gas_price / gas_transactions
+                # Normalize based on typical gas prices (this is simplified)
+                gas_efficiency_score = max(0, min(100, 100 - (avg_gas_price / 1e9 - 20) * 2))
+            else:
+                gas_efficiency_score = 50.0  # neutral score
+            
+            # Net flow
+            net_flow = incoming_volume - outgoing_volume
+            
+            return WalletMetrics(
+                address=address,
+                current_balance=balance,
+                total_transactions=total_transactions,
+                wallet_age=wallet_age,
+                average_transaction_value=average_transaction_value,
+                max_transaction_value=max_transaction_value,
+                unique_counterparties=len(counterparties),
+                gas_efficiency_score=gas_efficiency_score,
+                activity_frequency=activity_frequency,
+                last_activity_days=last_activity_days,
+                incoming_volume=incoming_volume,
+                outgoing_volume=outgoing_volume,
+                net_flow=net_flow,
+                contract_interactions=contract_interactions,
+                failed_transactions=failed_transactions,
+                data_source='real'
+            )
+            
+        except Exception as e:
+            logger.error(f"Error aggregating wallet data: {str(e)}")
+            # Return simulated data as fallback
+            return await self._generate_simulated_metrics(address)
     
-    def _convert_to_wallet_metrics(self, address: str, raw_data: Dict) -> WalletMetrics:
-        """Convert raw blockchain data to WalletMetrics"""
-        return WalletMetrics(
-            address=address,
-            tx_count=raw_data.get('tx_count', 0),
-            age_days=raw_data.get('age_days', 0),
-            balance_eth=raw_data.get('balance_eth', 0.0),
-            balance_usd=raw_data.get('balance_usd', 0.0),
-            unique_contracts=raw_data.get('unique_contracts', 0),
-            contract_interactions=raw_data.get('contract_interactions', 0),
-            defi_protocols=raw_data.get('defi_protocols', 0),
-            avg_tx_per_day=raw_data.get('avg_tx_per_day', 0.0),
-            last_activity_days=raw_data.get('last_activity_days', 0),
-            total_volume_eth=raw_data.get('total_volume_eth', 0.0),
-            gas_efficiency_score=raw_data.get('gas_efficiency_score', 0.0),
-            defi_protocols_used=raw_data.get('defi_protocols_used', []),
-            has_ens=raw_data.get('has_ens', False),
-            wash_trading_score=raw_data.get('wash_trading_score', 0.0),
-            mev_involvement=raw_data.get('mev_involvement', 0.0),
-            data_freshness=1.0,
-            confidence_score=0.95,
-            api_sources_used=['etherscan']
-        )
-    
-    async def _get_simulated_data(self, address: str) -> WalletMetrics:
-        """Generate realistic simulated data"""
+    async def _generate_simulated_metrics(self, address: str) -> WalletMetrics:
+        """Generate simulated metrics for testing when API fails"""
         import random
         
-        # Use address hash for consistent simulation
-        addr_hash = int(address[-8:], 16) if len(address) >= 8 else random.randint(1000, 9999)
-        random.seed(addr_hash)
-        
-        # Generate realistic metrics
-        age_days = random.randint(30, 1200)
-        tx_count = random.randint(10, 5000)
-        balance_eth = random.uniform(0.01, 100)
+        logger.warning(f"Generating simulated data for {address}")
         
         return WalletMetrics(
             address=address,
-            tx_count=tx_count,
-            age_days=age_days,
-            balance_eth=balance_eth,
-            balance_usd=balance_eth * 2000,  # Approximate ETH price
-            unique_contracts=random.randint(5, 50),
-            contract_interactions=random.randint(10, 200),
-            defi_protocols=random.randint(1, 8),
-            avg_tx_per_day=tx_count / max(age_days, 1),
-            last_activity_days=random.randint(0, 30),
-            total_volume_eth=balance_eth * random.uniform(2, 20),
-            gas_efficiency_score=random.uniform(0.3, 0.9),
-            defi_protocols_used=random.sample(['Uniswap', 'Aave', 'Compound', 'MakerDAO', 'Curve'], 
-                                            min(3, random.randint(1, 5))),
-            has_ens=random.choice([True, False]),
-            has_github=random.choice([True, False]),
-            has_twitter=random.choice([True, False]),
-            verified_credentials=random.randint(0, 4),
-            wash_trading_score=random.uniform(0, 0.3),
-            mev_involvement=random.uniform(0, 0.2),
-            data_freshness=0.8,
-            confidence_score=0.6,
-            api_sources_used=['simulated']
+            current_balance=random.uniform(0.1, 50.0),
+            total_transactions=random.randint(10, 1000),
+            wallet_age=random.randint(30, 1000),
+            average_transaction_value=random.uniform(0.01, 5.0),
+            max_transaction_value=random.uniform(1.0, 100.0),
+            unique_counterparties=random.randint(5, 100),
+            gas_efficiency_score=random.uniform(30, 95),
+            activity_frequency=random.uniform(0.1, 5.0),
+            last_activity_days=random.randint(1, 30),
+            incoming_volume=random.uniform(10.0, 500.0),
+            outgoing_volume=random.uniform(5.0, 450.0),
+            net_flow=random.uniform(-50.0, 100.0),
+            contract_interactions=random.randint(0, 50),
+            failed_transactions=random.randint(0, 10),
+            data_source='simulated'
         )
 
-
-class EnhancedTrustScorer(AdvancedTrustScorer):
-    """Enhanced trust scorer with additional features"""
+class TrustScoreCalculator:
+    """Calculate trust scores based on wallet metrics"""
     
     def __init__(self):
-        super().__init__()
-        self.cache = {}
-        self.cache_ttl = 300  # 5 minutes
-    
-    async def calculate_trust_score(self, metrics: WalletMetrics) -> Dict:
-        """Calculate trust score with caching"""
-        cache_key = f"{metrics.address}_{hash(str(metrics.analysis_timestamp))}"
-        
-        if cache_key in self.cache:
-            cached_result, timestamp = self.cache[cache_key]
-            if time.time() - timestamp < self.cache_ttl:
-                logger.info(f"Using cached score for {metrics.address[:8]}")
-                return cached_result
-        
-        # Calculate score using parent method
-        result = await super().calculate_trust_score(metrics)
-        
-        # Add recommendations
-        result["recommendations"] = self._generate_recommendations(metrics, result)
-        
-        # Cache result
-        self.cache[cache_key] = (result, time.time())
-        
-        return result
-    
-    def _generate_recommendations(self, metrics: WalletMetrics, score_result: Dict) -> List[str]:
-        """Generate actionable recommendations"""
-        recommendations = []
-        score = score_result["score"]
-        
-        if score < 40:
-            recommendations.append("Consider establishing a longer transaction history")
-            recommendations.append("Verify identity through ENS or social media")
-        elif score < 60:
-            recommendations.append("Increase DeFi protocol interactions for better trust signals")
-            recommendations.append("Maintain consistent transaction patterns")
-        elif score < 80:
-            recommendations.append("Continue building positive on-chain reputation")
-        else:
-            recommendations.append("Excellent trust profile - maintain current practices")
-        
-        # Specific recommendations based on metrics
-        if not metrics.has_ens:
-            recommendations.append("Consider registering an ENS domain")
-        
-        if metrics.defi_protocols < 3:
-            recommendations.append("Diversify DeFi protocol usage")
-        
-        if metrics.last_activity_days > 30:
-            recommendations.append("Increase recent on-chain activity")
-        
-        return recommendations[:3]  # Limit to top 3 recommendations
-
-
-# Main analysis function for backward compatibility
-async def analyze_wallet(address: str) -> Dict:
-    """
-    Main wallet analysis function - backward compatible interface
-    """
-    logger.info(f"✅ Starting wallet analysis for {address[:8]}...")
-    
-    try:
-        # Use enhanced aggregator if available, fall back to simple one
-        try:
-            aggregator = EnhancedWalletDataAggregator()
-            metrics = await aggregator.aggregate_wallet_data(address)
-            await aggregator.cleanup()
-        except Exception as e:
-            logger.warning(f"Enhanced aggregator failed, using simple aggregator: {e}")
-            aggregator = WalletDataAggregator()
-            metrics = await aggregator.aggregate_wallet_data(address)
-        
-        # Calculate trust score
-        scorer = EnhancedTrustScorer()
-        score_result = await scorer.calculate_trust_score(metrics)
-        
-        # Format response for backward compatibility
-        response = {
-            "address": address,
-            "trust_score": score_result["score"],
-            "risk_level": score_result["risk_level"],
-            "confidence": score_result["confidence"],
-            "explanation": score_result["explanation"],
-            "risk_factors": score_result["risk_factors"],
-            "recommendations": score_result.get("recommendations", []),
-            "metadata": score_result.get("metadata", {}),
-            
-            # Raw metrics for detailed analysis
-            "raw_metrics": {
-                "wallet_age": f"{metrics.age_days} days",
-                "last_activity": f"{metrics.last_activity_days} days ago",
-                "total_transactions": f"{metrics.tx_count:,}",
-                "current_balance": f"{metrics.balance_eth:.4f} ETH",
-                "avg_daily_transactions": f"{metrics.avg_tx_per_day:.2f}",
-                "defi_protocols": metrics.defi_protocols_used if metrics.defi_protocols_used else ["Uniswap", "Aave", "Compound"][:metrics.defi_protocols],
-                "identity_factors": [
-                    factor for factor, present in [
-                        ("ENS Domain", metrics.has_ens),
-                        ("GitHub", metrics.has_github),
-                        ("Twitter", metrics.has_twitter),
-                        ("Farcaster", metrics.has_farcaster),
-                        ("Lens Protocol", metrics.has_lens)
-                    ] if present
-                ],
-                "risk_tags": [
-                    tag for tag, condition in [
-                        ("High Frequency", metrics.avg_tx_per_day > 50),
-                        ("MEV Involvement", metrics.mev_involvement > 0.3),
-                        ("Mixer Usage", metrics.mixer_usage > 0),
-                        ("Wash Trading", metrics.wash_trading_score > 0.5),
-                        ("New Wallet", metrics.age_days < 30),
-                        ("Inactive", metrics.last_activity_days > 90)
-                    ] if condition
-                ],
-                "data_source": "real" if metrics.data_freshness > 0.9 else "simulated"
-            }
+        # Scoring weights (must sum to 1.0)
+        self.weights = {
+            'balance': 0.15,
+            'activity': 0.20,
+            'age': 0.15,
+            'transaction_patterns': 0.20,
+            'network_behavior': 0.15,
+            'risk_factors': 0.15
         }
+    
+    def calculate_trust_score(self, metrics: WalletMetrics) -> Dict[str, Any]:
+        """Calculate comprehensive trust score"""
         
-        logger.info(f"🎯 Analysis complete for {address[:8]} - Score: {score_result['score']}")
-        return response
+        # Component scores (0-100)
+        balance_score = self._score_balance(metrics)
+        activity_score = self._score_activity(metrics)
+        age_score = self._score_age(metrics)
+        transaction_score = self._score_transactions(metrics)
+        network_score = self._score_network_behavior(metrics)
+        risk_score = self._score_risk_factors(metrics)
         
-    except Exception as e:
-        logger.error(f"❌ Analysis failed for {address}: {e}")
-        raise e
+        # Weighted total score
+        total_score = (
+            balance_score * self.weights['balance'] +
+            activity_score * self.weights['activity'] +
+            age_score * self.weights['age'] +
+            transaction_score * self.weights['transaction_patterns'] +
+            network_score * self.weights['network_behavior'] +
+            risk_score * self.weights['risk_factors']
+        )
+        
+        # Determine risk level
+        if total_score >= 80:
+            risk_level = 'very_low'
+        elif total_score >= 60:
+            risk_level = 'low'
+        elif total_score >= 40:
+            risk_level = 'medium'
+        elif total_score >= 20:
+            risk_level = 'high'
+        else:
+            risk_level = 'very_high'
+        
+        # Calculate confidence based on data completeness
+        confidence = self._calculate_confidence(metrics)
+        
+        # Identify risk factors
+        risk_factors = self._identify_risk_factors(metrics)
+        
+        return {
+            'trust_score': round(total_score),
+            'risk_level': risk_level,
+            'confidence': confidence,
+            'component_scores': {
+                'balance': round(balance_score),
+                'activity': round(activity_score),
+                'age': round(age_score),
+                'transactions': round(transaction_score),
+                'network': round(network_score),
+                'risk': round(risk_score)
+            },
+            'risk_factors': risk_factors,
+            'raw_metrics': metrics.to_dict()
+        }
+    
+    def _score_balance(self, metrics: WalletMetrics) -> float:
+        """Score based on current balance (0-100)"""
+        balance = metrics.current_balance
+        
+        if balance >= 10.0:
+            return 100.0
+        elif balance >= 1.0:
+            return 60.0 + (balance - 1.0) * 4.44  # Linear scale from 60-100
+        elif balance >= 0.1:
+            return 20.0 + (balance - 0.1) * 44.44  # Linear scale from 20-60
+        elif balance > 0:
+            return balance * 200  # Linear scale from 0-20
+        else:
+            return 0.0
+    
+    def _score_activity(self, metrics: WalletMetrics) -> float:
+        """Score based on activity patterns (0-100)"""
+        if metrics.total_transactions == 0:
+            return 0.0
+        
+        # Activity frequency component
+        freq_score = min(100, metrics.activity_frequency * 20)  # Cap at 5 tx/day = 100
+        
+        # Recent activity component
+        if metrics.last_activity_days <= 7:
+            recency_score = 100.0
+        elif metrics.last_activity_days <= 30:
+            recency_score = 80.0
+        elif metrics.last_activity_days <= 90:
+            recency_score = 50.0
+        else:
+            recency_score = 20.0
+        
+        return (freq_score + recency_score) / 2
+    
+    def _score_age(self, metrics: WalletMetrics) -> float:
+        """Score based on wallet age (0-100)"""
+        age = metrics.wallet_age
+        
+        if age >= 365:  # 1+ years
+            return 100.0
+        elif age >= 180:  # 6+ months
+            return 70.0 + (age - 180) * 30 / 185
+        elif age >= 30:   # 1+ months
+            return 30.0 + (age - 30) * 40 / 150
+        elif age > 0:
+            return age  # Linear scale from 0-30
+        else:
+            return 0.0
+    
+    def _score_transactions(self, metrics: WalletMetrics) -> float:
+        """Score based on transaction patterns (0-100)"""
+        if metrics.total_transactions == 0:
+            return 0.0
+        
+        # Transaction volume score
+        volume_score = min(100, metrics.total_transactions / 10)  # Cap at 1000 transactions = 100
+        
+        # Value diversity score
+        if metrics.average_transaction_value > 0:
+            value_ratio = metrics.max_transaction_value / metrics.average_transaction_value
+            diversity_score = max(0, min(100, 100 - (value_ratio - 1) * 2))
+        else:
+            diversity_score = 50.0
+        
+        # Failed transaction penalty
+        if metrics.total_transactions > 0:
+            failure_rate = metrics.failed_transactions / metrics.total_transactions
+            failure_penalty = failure_rate * 50  # Max 50 point penalty
+        else:
+            failure_penalty = 0
+        
+        return max(0, (volume_score + diversity_score) / 2 - failure_penalty)
+    
+    def _score_network_behavior(self, metrics: WalletMetrics) -> float:
+        """Score based on network interaction patterns (0-100)"""
+        if metrics.total_transactions == 0:
+            return 0.0
+        
+        # Counterparty diversity
+        counterparty_score = min(100, metrics.unique_counterparties * 2)  # Cap at 50 unique = 100
+        
+        # Contract interaction score (indicates legitimate usage)
+        if metrics.total_transactions > 0:
+            contract_ratio = metrics.contract_interactions / metrics.total_transactions
+            contract_score = min(100, contract_ratio * 200) # e.g. 50% contract interaction -> 100 score
+        else:
+            contract_score = 0.0
+        
+        # Gas efficiency score
+        gas_score = metrics.gas_efficiency_score
+        
+        return (counterparty_score + contract_score + gas_score) / 3
+        
+    def _score_risk_factors(self, metrics: WalletMetrics) -> float:
+        """Score based on identified risk factors (0-100, where 100 is low risk)"""
+        risk_penalty = 0
+        
+        # High net outflow
+        if metrics.outgoing_volume > 0 and (metrics.net_flow / metrics.outgoing_volume) < -0.8:
+            risk_penalty += 20
+        
+        # Very new wallet
+        if metrics.wallet_age < 7:
+            risk_penalty += 25
+        
+        # Low transaction count
+        if metrics.total_transactions < 5:
+            risk_penalty += 15
+        
+        # High failure rate
+        if metrics.total_transactions > 0 and (metrics.failed_transactions / metrics.total_transactions) > 0.2:
+            risk_penalty += 20
+        
+        # Low unique counterparties (potential self-dealing)
+        if metrics.unique_counterparties < 3 and metrics.total_transactions > 5:
+            risk_penalty += 15
+            
+        return max(0, 100 - risk_penalty)
+
+    def _calculate_confidence(self, metrics: WalletMetrics) -> float:
+        """Calculate confidence score based on data source and completeness"""
+        if metrics.data_source == 'simulated':
+            return 0.6  # Lower confidence for simulated data
+        
+        confidence = 0.8  # Base confidence for real data
+        if metrics.total_transactions > 100:
+            confidence += 0.1
+        if metrics.wallet_age > 90:
+            confidence += 0.1
+        
+        return min(1.0, round(confidence, 2))
+
+    def _identify_risk_factors(self, metrics: WalletMetrics) -> List[str]:
+        """Identify and list potential risk factors"""
+        factors = []
+        
+        if metrics.wallet_age < 30:
+            factors.append("New wallet (<30 days)")
+        if metrics.last_activity_days > 90:
+            factors.append("Inactive for >90 days")
+        if metrics.total_transactions < 10:
+            factors.append("Low transaction history (<10)")
+        if metrics.unique_counterparties < 5 and metrics.total_transactions > 10:
+            factors.append("Limited network interaction")
+        if metrics.total_transactions > 0 and (metrics.failed_transactions / metrics.total_transactions) > 0.1:
+            factors.append("High rate of failed transactions")
+        if metrics.outgoing_volume > 0 and (metrics.net_flow / metrics.outgoing_volume) < -0.5:
+            factors.append("Significant net outflow of funds")
+        if metrics.current_balance < 0.01:
+            factors.append("Very low current balance")
+            
+        return factors
+
+async def analyze_wallet(address: str, api_key: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Main entry point for wallet analysis.
+    Initializes dependencies and returns the full analysis result.
+    """
+    if not api_key:
+        logger.warning("No Etherscan API key provided. Using simulated data.")
+        # In a real app, you might have a different way to handle this,
+        # but for this script, we'll just generate simulated data directly.
+        metrics = await WalletDataAggregator(None)._generate_simulated_metrics(address)
+    else:
+        async with EtherscanAPI(api_key) as etherscan:
+            aggregator = WalletDataAggregator(etherscan)
+            metrics = await aggregator.aggregate_wallet_data(address)
+
+    calculator = TrustScoreCalculator()
+    score_result = calculator.calculate_trust_score(metrics)
+    
+    return score_result
+
+# Example usage (for direct script execution)
+async def main():
+    import os
+    from dotenv import load_dotenv
+    
+    load_dotenv()
+    
+    api_key = os.getenv("ETHERSCAN_API_KEY")
+    wallet_address = "0x73BCEb1Cd57C711feC4224D864b04132486B1Be0"  # Example: Vitalik Buterin's address
+    
+    if not api_key:
+        print("ETHERSCAN_API_KEY not found in .env file. Running with simulated data.")
+    
+    result = await analyze_wallet(wallet_address, api_key)
+    
+    print(json.dumps(result, indent=2))
+
+if __name__ == "__main__":
+    asyncio.run(main())

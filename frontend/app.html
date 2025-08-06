@@ -554,6 +554,149 @@
             fill: var(--text-primary);
         }
 
+        /* Alith AI Agent Chat Widget Styles */
+.chat-bubble {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 60px;
+    height: 60px;
+    background: var(--accent-gradient);
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    z-index: 1000;
+    transition: all 0.3s ease;
+    color: var(--button-text);
+}
+
+.chat-bubble:hover {
+    transform: scale(1.1);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+}
+
+.chat-window {
+    position: fixed;
+    bottom: 6.5rem;
+    right: 2rem;
+    width: 370px;
+    max-width: 90vw;
+    height: 500px;
+    max-height: 70vh;
+    background: var(--glass-bg);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 999;
+    transform-origin: bottom right;
+    transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+}
+
+.chat-window.hidden {
+    transform: scale(0);
+    opacity: 0;
+    pointer-events: none;
+}
+
+.chat-header {
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.chat-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.close-chat-button {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.close-chat-button:hover {
+    opacity: 1;
+}
+
+.chat-messages {
+    flex-grow: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.message {
+    max-width: 80%;
+    padding: 0.75rem 1rem;
+    border-radius: 18px;
+    line-height: 1.5;
+    word-wrap: break-word;
+}
+
+.user-message {
+    background: var(--accent-gradient);
+    color: var(--button-text);
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.bot-message {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}
+
+.chat-input-area {
+    display: flex;
+    padding: 1rem;
+    border-top: 1px solid var(--glass-border);
+    background: rgba(0,0,0,0.1);
+}
+
+#chat-input {
+    flex-grow: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 1rem;
+    padding: 0.5rem;
+}
+
+#send-chat-button {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: background 0.2s;
+}
+
+#send-chat-button:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
         /* Animation Classes */
         .fade-in {
             animation: fadeIn 0.5s ease-out;
@@ -1175,6 +1318,116 @@
                 analyzeButton.disabled = false;
             }
         });
+
+        // --- Alith AI Agent Chat Logic ---
+        const chatBubble = document.getElementById('chat-bubble');
+        const chatWindow = document.getElementById('chat-window');
+        const closeChat = document.getElementById('close-chat');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        const sendChatButton = document.getElementById('send-chat-button');
+
+        // Toggle chat window
+        chatBubble.addEventListener('click', () => {
+            chatWindow.classList.toggle('hidden');
+        });
+
+        closeChat.addEventListener('click', () => {
+            chatWindow.classList.add('hidden');
+        });
+
+        // Function to add a message to the chat window
+        const addMessage = (text, sender) => {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', `${sender}-message`);
+            // Sanitize text before adding to prevent XSS
+            const p = document.createElement('p');
+            p.textContent = text;
+            messageElement.appendChild(p);
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll to bottom
+        };
+
+        // Handle sending a message
+        const handleSendMessage = async () => {
+            const query = chatInput.value.trim();
+            if (!query) return;
+
+            addMessage(query, 'user');
+            chatInput.value = '';
+
+            // Show typing indicator
+            const typingIndicator = document.createElement('div');
+            typingIndicator.classList.add('message', 'bot-message');
+            typingIndicator.innerHTML = `<p>Thinking...</p>`;
+            chatMessages.appendChild(typingIndicator);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ query: query }),
+                });
+
+                chatMessages.removeChild(typingIndicator); // Remove typing indicator
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                addMessage(data.response, 'bot');
+
+            } catch (error) {
+                console.error('AI Chat Error:', error);
+                if (typingIndicator.parentNode) {
+                    chatMessages.removeChild(typingIndicator);
+                }
+                addMessage(`Sorry, I encountered an error: ${error.message}`, 'bot');
+            }
+        };
+
+        // Event listeners for sending
+        sendChatButton.addEventListener('click', handleSendMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleSendMessage();
+            }
+        });
     </script>
+
+    <!-- Alith AI Agent Chat Widget -->
+    <div id="ai-chat-widget">
+        <button id="chat-bubble" class="chat-bubble">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 28px; height: 28px;">
+                <path d="M4.913 2.658c2.075-.615 4.19-.129 5.717 1.135a5.99 5.99 0 015.717-1.135c2.075.615 3.58 2.396 3.58 4.5 0 2.104-1.505 3.885-3.58 4.5a5.99 5.99 0 01-5.717 1.135 5.99 5.99 0 01-5.717-1.135c-2.075-.615-3.58-2.396-3.58-4.5 0-2.104 1.505-3.885 3.58-4.5z" />
+                <path d="M6.727 21.06a5.977 5.977 0 01-5.717-4.5 5.977 5.977 0 015.717-4.5 5.977 5.977 0 015.717 4.5 5.977 5.977 0 01-5.717 4.5z" />
+                <path d="M17.273 21.06a5.977 5.977 0 01-5.717-4.5 5.977 5.977 0 015.717-4.5 5.977 5.977 0 015.717 4.5 5.977 5.977 0 01-5.717 4.5z" />
+            </svg>
+        </button>
+        <div id="chat-window" class="chat-window hidden">
+            <div class="chat-header glass">
+                <h3>TrustLens AI Agent</h3>
+                <button id="close-chat" class="close-chat-button">&times;</button>
+            </div>
+            <div id="chat-messages" class="chat-messages">
+                <div class="message bot-message">
+                    <p>Hello! I'm the TrustLens AI agent. Ask me to analyze any Ethereum wallet or ENS name.</p>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="e.g., 'analyze vitalik.eth'">
+                <button id="send-chat-button">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 24px; height: 24px;">
+                        <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
   </body>
 </html>

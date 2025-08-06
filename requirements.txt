@@ -1,16 +1,20 @@
-# TrustLens.AI - Core Dependencies
-fastapi==0.111.0
-uvicorn[standard]==0.29.0
-python-dotenv==1.0.1
-aiohttp==3.9.5
-redis==5.0.4
-web3==6.15.1
+# --- Core Framework ---
+fastapi
+uvicorn[standard]
 
-# API & Data
-requests==2.32.3
-beautifulsoup4==4.12.3
-lxml==5.2.2
+# --- Environment & API Keys ---
+python-dotenv
 
-# Utility
-colorlog==6.8.2
-backoff==2.2.1
+# --- Blockchain & Web3 ---
+web3>=6.16.0
+aiohttp
+
+# --- AI Agent ---
+alith==0.5.1
+
+# --- Data & Caching ---
+redis
+requests
+
+# --- Data Models ---
+pydantic
