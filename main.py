@@ -329,9 +329,26 @@ async def chat_with_ai(
     start_time = time.time()
     
     if not settings.enable_ai_analysis or not trustlens_agent:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="AI analysis is currently unavailable"
+        # Provide helpful fallback response instead of error
+        processing_time = round((time.time() - start_time) * 1000, 2)
+        fallback_response = """🤖 Hello! I'm the TrustLens AI agent, but I'm currently running in limited mode.
+        
+💡 **To enable full AI analysis, please:**
+1. Add your `GEMINI_API_KEY` to the `.env` file
+2. Ensure `ENABLE_AI_ANALYSIS=true` in your `.env` file
+3. Restart the server
+
+📝 **I can still help you with:**
+- General crypto security advice
+- Explaining wallet analysis concepts
+- Guidance on using TrustLens.AI
+
+🔧 **Current status:** AI analysis disabled (missing API key or configuration)"""
+        
+        return ChatResponse(
+            response=fallback_response,
+            conversation_id=conversation_id,
+            processing_time_ms=processing_time
         )
     
     conversation_id = chat_request.conversation_id or f"chat_{int(time.time() * 1000)}"
