@@ -353,25 +353,17 @@ async def chat_with_ai(
     
     conversation_id = chat_request.conversation_id or f"chat_{int(time.time() * 1000)}"
     
-    logger.info(
-        "AI chat request received",
-        message_preview=chat_request.message[:50],
-        conversation_id=conversation_id
-    )
+    logger.info(f"AI chat request received - Message: {chat_request.message[:50]}... - Conversation ID: {conversation_id}")
     
     try:
         ai_response = await asyncio.wait_for(
-            trustlens_agent.run_async(chat_request.message),
+            trustlens_agent.run(chat_request.message),
             timeout=float(settings.request_timeout)
         )
         
         processing_time = round((time.time() - start_time) * 1000, 2)
         
-        logger.info(
-            "AI chat completed",
-            conversation_id=conversation_id,
-            processing_time_ms=processing_time
-        )
+        logger.info(f"AI chat completed - Conversation ID: {conversation_id} - Processing time: {processing_time}ms")
         
         return ChatResponse(
             response=ai_response,
@@ -380,17 +372,13 @@ async def chat_with_ai(
         )
         
     except asyncio.TimeoutError:
-        logger.error("AI chat timed out", conversation_id=conversation_id)
+        logger.error(f"AI chat timed out - Conversation ID: {conversation_id}")
         raise HTTPException(
             status_code=status.HTTP_408_REQUEST_TIMEOUT,
             detail="AI response timed out"
         )
     except Exception as e:
-        logger.error(
-            "AI chat failed",
-            error=str(e),
-            conversation_id=conversation_id
-        )
+        logger.error(f"AI chat failed - Error: {str(e)} - Conversation ID: {conversation_id}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"AI chat failed: {str(e)}"
