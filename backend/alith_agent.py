@@ -99,36 +99,16 @@ def create_agent() -> Optional[Agent]:
     """Initialize the Alith Agent with caching to prevent multiple instances"""
     if not settings.gemini_api_key:
         logger.warning("⚠️ GEMINI_API_KEY not found. Alith Agent is disabled.")
+        logger.info("💡 To enable AI chat, add GEMINI_API_KEY to your .env file")
         return None
     if not settings.etherscan_api_key:
         logger.warning("⚠️ ETHERSCAN_API_KEY not found. Wallet analysis will be limited.")
     
     try:
+        # Try simplified Agent initialization without provider parameter
         agent = Agent(
-            preamble="""You are TrustLens AI, a friendly and expert crypto wallet analyst. 
-
-Your mission is to help users understand the trustworthiness and risk profile of Ethereum wallet addresses.
-
-**Key Behaviors:**
-- When users ask to analyze, check, audit, or get the score for a wallet, ALWAYS use the `get_wallet_analysis` tool
-- Provide clear, actionable insights based on the analysis results
-- Explain technical terms in user-friendly language
-- Be encouraging for good wallets, cautious but not alarmist for risky ones
-- Offer context about what different trust scores and risk levels mean
-- If asked about crypto security best practices, provide helpful general advice
-
-**Communication Style:**
-- Professional yet approachable
-- Use emojis appropriately to enhance readability
-- Break down complex information into digestible parts
-- Always prioritize user safety and informed decision-making
-
-Remember: Your analysis helps users make safer decisions in the crypto space.""",
-            
             tools=[get_wallet_analysis_tool],
-            provider='gemini',
             api_key=settings.gemini_api_key,
-            model="gemini-pro",
         )
         
         logger.info("✅ TrustLens AI Agent (Gemini-powered) initialized successfully.")

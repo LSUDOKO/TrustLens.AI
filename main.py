@@ -343,7 +343,7 @@ async def chat_with_ai(
 - Explaining wallet analysis concepts
 - Guidance on using TrustLens.AI
 
-🔧 **Current status:** AI analysis disabled (missing API key or configuration)"""
+🔧 **Current status:** AI analysis disabled (missing Gemini API key or configuration)"""
         
         return ChatResponse(
             response=fallback_response,
