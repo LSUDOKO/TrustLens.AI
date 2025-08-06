@@ -105,8 +105,9 @@ def create_agent() -> Optional[Agent]:
         logger.warning("⚠️ ETHERSCAN_API_KEY not found. Wallet analysis will be limited.")
     
     try:
-        # Try simplified Agent initialization without provider parameter
+        # Initialize Agent with required parameters
         agent = Agent(
+            model="gemini-pro",
             tools=[get_wallet_analysis_tool],
             api_key=settings.gemini_api_key,
         )
