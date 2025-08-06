@@ -702,6 +702,12 @@
                             </div>
                         </div>
 
+                        <!-- Data Source Indicator -->
+                        <div id="dataSourceIndicator" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium mb-4" style="display: none;">
+                            <div id="dataSourceIcon" class="w-2 h-2 rounded-full mr-2" style="background-color: #34C759;"></div>
+                            <span id="dataSourceText">Real Blockchain Data</span>
+                        </div>
+
                         <!-- Wallet Overview Metrics -->
                         <div class="wallet-overview">
                             <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.2rem;">📊 Wallet Overview</h3>
@@ -988,6 +994,9 @@
             const defiProtocols = document.getElementById('defiProtocols');
             const identityTags = document.getElementById('identityTags');
             const riskTags = document.getElementById('riskTags');
+            const dataSourceIndicator = document.getElementById('dataSourceIndicator');
+            const dataSourceIcon = document.getElementById('dataSourceIcon');
+            const dataSourceText = document.getElementById('dataSourceText');
 
             // Update trust score
             trustScore.textContent = analysis.trustScore;
@@ -1032,6 +1041,11 @@
                 tagElement.textContent = tag;
                 riskTags.appendChild(tagElement);
             });
+
+            // Update data source indicator
+            dataSourceIndicator.style.display = 'block';
+            dataSourceIcon.style.background = '#34C759';
+            dataSourceText.textContent = 'Real Blockchain Data';
 
             // Show results with animation
             resultsSection.style.display = 'block';

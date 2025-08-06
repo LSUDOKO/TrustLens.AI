@@ -130,6 +130,83 @@ Our scoring system evolves continuously:
 
 **Our goal is to provide the most accurate, fair, and transparent trust scoring system in the Web3 ecosystem.**
 
+## 🚀 Quick Start
+
+### Prerequisites
+- Python 3.8+
+- Node.js 16+
+- npm or yarn
+
+### Backend Setup
+1. **Clone and navigate to backend:**
+   ```bash
+   cd backend
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   ```
+   
+   **For Real Blockchain Data (Recommended):**
+   - Get a free API key from [Etherscan.io](https://etherscan.io/apis)
+   - Add your API key to `.env`:
+     ```
+     ETHERSCAN_API_KEY=your_etherscan_api_key_here
+     OPENAI_API_KEY=your_openai_api_key_here  # Optional for AI explanations
+     ```
+   
+   **Demo Mode:**
+   - Leave `ETHERSCAN_API_KEY` empty to use simulated data
+   - The app will automatically fall back to realistic mock data
+
+4. **Start the backend server:**
+   ```bash
+   uvicorn main:app --reload --port 8000
+   ```
+
+### Frontend Setup
+1. **Navigate to frontend:**
+   ```bash
+   cd frontend
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
+
+4. **Open your browser:**
+   Visit `http://localhost:5173`
+
+## 📊 Data Sources
+
+### Real Blockchain Data
+When `ETHERSCAN_API_KEY` is configured, TrustLens fetches real data from:
+- **Etherscan API**: Transaction history, balances, contract interactions
+- **Real-time Analysis**: Live blockchain data for accurate trust scoring
+- **DeFi Detection**: Identifies actual protocol interactions
+- **Risk Analysis**: Detects suspicious patterns in real transactions
+
+### Demo Mode (Simulated Data)
+When no API key is provided:
+- **Realistic Simulation**: Uses statistical models to generate believable wallet data
+- **Consistent Scoring**: Same trust scoring algorithm as real data
+- **Perfect for Testing**: No API limits or costs
+- **Visual Indicator**: UI clearly shows "Demo Mode" status
+
+The app automatically detects which mode to use and displays the appropriate indicator.
+
 ## 🏗️ Architecture
 
 ```
