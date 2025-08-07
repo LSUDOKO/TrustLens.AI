@@ -900,7 +900,33 @@
                             </div>
                         </div>
 
-                        <div class="analysis-grid">
+                        <!-- AI-Powered Transaction Simulation -->
+                        <div class="wallet-overview" style="margin-top: 2rem;">
+                            <h3 style="color: var(--text-primary); margin-bottom: 1rem; font-size: 1.2rem;">🧠 AI Transaction Simulator</h3>
+                            <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border); border-radius: 15px; padding: 1.5rem;">
+                                <p style="color: var(--text-secondary); margin-bottom: 1rem;">Simulate a transaction to assess risk before sending funds:</p>
+                                
+                                <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: end;">
+                                    <div>
+                                        <label style="color: var(--text-primary); font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">To Address:</label>
+                                        <input type="text" id="simulateToAddress" placeholder="0x..." style="width: 100%; padding: 0.75rem; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 10px; color: var(--text-primary); outline: none;">
+                                    </div>
+                                    <div>
+                                        <label style="color: var(--text-primary); font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Amount (ETH):</label>
+                                        <input type="number" id="simulateAmount" placeholder="1.0" step="0.001" style="width: 100%; padding: 0.75rem; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 10px; color: var(--text-primary); outline: none;">
+                                    </div>
+                                    <button id="simulateButton" style="padding: 0.75rem 1.5rem; background: var(--accent-gradient); color: var(--button-text); border: none; border-radius: 10px; cursor: pointer; font-weight: 600;">
+                                        🔮 Simulate
+                                    </button>
+                                </div>
+                                
+                                <div id="simulationResults" style="display: none; margin-top: 1rem; padding: 1rem; background: rgba(255, 255, 255, 0.03); border-radius: 10px;">
+                                    <!-- Simulation results will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="analysis-grid"></div>
                             <div class="analysis-card">
                                 <div class="card-title">🔒 Security Analysis</div>
                                 <div class="card-content" id="securityAnalysis">
@@ -1002,12 +1028,15 @@
             });
         });
 
-        // Form submission
+        // Form submission with real API integration
         walletForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const address = walletInput.value.trim();
             if (!address) return;
+
+            // Store current wallet address for transaction simulation
+            currentWalletAddress = address;
 
             // Show loading
             loadingSpinner.style.display = 'block';
@@ -1015,16 +1044,30 @@
             analyzeButton.disabled = true;
 
             try {
-                // Simulate API call
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                // Call real API
+                const response = await fetch('http://127.0.0.1:8000/api/v2/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        address: address,
+                        blockchain: 'ethereum',
+                        include_metadata: true
+                    })
+                });
                 
-                // Generate mock analysis
-                const analysis = generateMockAnalysis(address);
-                displayResults(analysis);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayEnhancedResults(data);
+                } else {
+                    throw new Error(data.detail || 'Analysis failed');
+                }
                 
             } catch (error) {
                 console.error('Analysis failed:', error);
-                alert('Failed to analyze wallet. Please try again.');
+                alert(`Failed to analyze wallet: ${error.message}`);
             } finally {
                 loadingSpinner.style.display = 'none';
                 analyzeButton.disabled = false;
@@ -1119,6 +1162,43 @@
                 ],
                 riskTags: riskFactors.length > 0 ? riskFactors : ['Clean History']
             };
+        }
+
+        function displayEnhancedResults(data) {
+            // Update trust score
+            const trustScore = document.getElementById('trustScore');
+            const scoreDescription = document.getElementById('scoreDescription');
+            
+            trustScore.textContent = data.trust_score;
+            trustScore.className = `score-value ${data.trust_score >= 80 ? 'score-high' : data.trust_score >= 60 ? 'score-medium' : 'score-low'}`;
+            scoreDescription.textContent = data.explanation || 'Analysis completed with AI-powered insights.';
+            
+            // Update wallet metrics
+            const metadata = data.metadata || {};
+            document.getElementById('walletAge').textContent = metadata.age_days ? `${metadata.age_days} days` : '--';
+            document.getElementById('currentBalance').textContent = metadata.balance_usd ? `${metadata.balance_usd.toFixed(4)} ETH` : '--';
+            document.getElementById('totalTransactions').textContent = metadata.transaction_count ? metadata.transaction_count.toLocaleString() : '--';
+            document.getElementById('lastActivity').textContent = metadata.last_activity ? new Date(metadata.last_activity).toLocaleDateString() : '--';
+            document.getElementById('avgDailyTx').textContent = metadata.age_days && metadata.transaction_count ? (metadata.transaction_count / metadata.age_days).toFixed(2) : '--';
+            document.getElementById('defiProtocols').textContent = metadata.contract_interactions || '--';
+            
+            // Show data source indicator
+            const dataSourceIndicator = document.getElementById('dataSourceIndicator');
+            const dataSourceText = document.getElementById('dataSourceText');
+            const dataSourceIcon = document.getElementById('dataSourceIcon');
+            
+            if (data.cached) {
+                dataSourceText.textContent = 'Cached Data';
+                dataSourceIcon.style.backgroundColor = '#FF9500';
+            } else {
+                dataSourceText.textContent = 'Real Blockchain Data';
+                dataSourceIcon.style.backgroundColor = '#34C759';
+            }
+            dataSourceIndicator.style.display = 'flex';
+            
+            // Show results
+            resultsSection.style.display = 'block';
+            resultsSection.classList.add('fade-in');
         }
 
         function displayResults(analysis) {
@@ -1366,6 +1446,116 @@
             chatMessages.appendChild(messageElement);
             chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll to bottom
         };
+
+        // Transaction Simulation Functionality
+        let currentWalletAddress = null;
+        
+        const simulateButton = document.getElementById('simulateButton');
+        const simulateToAddress = document.getElementById('simulateToAddress');
+        const simulateAmount = document.getElementById('simulateAmount');
+        const simulationResults = document.getElementById('simulationResults');
+        
+        simulateButton.addEventListener('click', async () => {
+            if (!currentWalletAddress) {
+                alert('Please analyze a wallet first before simulating transactions.');
+                return;
+            }
+            
+            const toAddress = simulateToAddress.value.trim();
+            const amount = parseFloat(simulateAmount.value);
+            
+            if (!toAddress || !amount || amount <= 0) {
+                alert('Please enter a valid recipient address and amount.');
+                return;
+            }
+            
+            simulateButton.textContent = '🔄 Simulating...';
+            simulateButton.disabled = true;
+            
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/v2/simulate-transaction', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        from_address: currentWalletAddress,
+                        to_address: toAddress,
+                        amount_eth: amount
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displaySimulationResults(data);
+                } else {
+                    simulationResults.innerHTML = `<p style="color: var(--danger-color);">❌ Simulation failed: ${data.detail || 'Unknown error'}</p>`;
+                    simulationResults.style.display = 'block';
+                }
+            } catch (error) {
+                simulationResults.innerHTML = `<p style="color: var(--danger-color);">❌ Network error: ${error.message}</p>`;
+                simulationResults.style.display = 'block';
+            } finally {
+                simulateButton.textContent = '🔮 Simulate';
+                simulateButton.disabled = false;
+            }
+        });
+        
+        function displaySimulationResults(data) {
+            const riskColor = {
+                'MINIMAL': 'var(--success-color)',
+                'LOW': 'var(--success-color)',
+                'MEDIUM': 'var(--warning-color)',
+                'HIGH': 'var(--danger-color)',
+                'CRITICAL': 'var(--danger-color)'
+            }[data.risk_level] || 'var(--text-secondary)';
+            
+            const riskEmoji = {
+                'MINIMAL': '✅',
+                'LOW': '🟢',
+                'MEDIUM': '🟡',
+                'HIGH': '🟠',
+                'CRITICAL': '🔴'
+            }[data.risk_level] || '⚪';
+            
+            let html = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="color: var(--text-primary); margin: 0;">🔮 Transaction Risk Assessment</h4>
+                    <div style="color: ${riskColor}; font-weight: bold;">${riskEmoji} ${data.risk_level} RISK (${data.risk_score}/100)</div>
+                </div>
+                
+                <div style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                    <div style="color: var(--text-secondary); font-size: 0.9rem;">Estimated Loss Probability:</div>
+                    <div style="color: var(--text-primary); font-size: 1.1rem; font-weight: bold;">${(data.estimated_loss_probability * 100).toFixed(1)}%</div>
+                </div>
+            `;
+            
+            if (data.warnings && data.warnings.length > 0) {
+                html += `
+                    <div style="margin-bottom: 1rem;">
+                        <h5 style="color: var(--warning-color); margin-bottom: 0.5rem;">⚠️ Warnings:</h5>
+                        <ul style="margin: 0; padding-left: 1.5rem; color: var(--text-secondary);">
+                            ${data.warnings.map(warning => `<li>${warning}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            if (data.recommendations && data.recommendations.length > 0) {
+                html += `
+                    <div>
+                        <h5 style="color: var(--info-color); margin-bottom: 0.5rem;">💡 Recommendations:</h5>
+                        <ul style="margin: 0; padding-left: 1.5rem; color: var(--text-secondary);">
+                            ${data.recommendations.map(rec => `<li>${rec}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            simulationResults.innerHTML = html;
+            simulationResults.style.display = 'block';
+        }
 
         // Handle sending a message
         const handleSendMessage = async () => {
