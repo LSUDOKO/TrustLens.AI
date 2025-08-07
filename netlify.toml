@@ -3,14 +3,20 @@
   base = "frontend/"
   
   # Directory that contains the deploy-ready HTML files and assets
-  publish = "frontend/dist/"
+  publish = "dist/"
   
-  # Default build command
-  command = "npm run build"
+  # Build command with error handling
+  command = "npm ci --legacy-peer-deps && npm run build"
 
 [build.environment]
-  # Node.js version
+  # Node.js version - using 18 for better stability
   NODE_VERSION = "18"
+  # Node options for better memory management
+  NODE_OPTIONS = "--max-old-space-size=4096"
+  # Environment settings
+  NODE_ENV = "production"
+  # NPM configuration
+  NPM_CONFIG_PRODUCTION = "false"
 
 # Redirect rules for SPA (Single Page Application)
 [[redirects]]

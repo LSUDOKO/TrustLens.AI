@@ -166,19 +166,25 @@ REDIS_URL=redis://your-redis-url:6379
 
 ### Common Issues:
 
-1. **Build fails on Netlify:**
+1. **Build fails with "crypto.hash is not a function":**
 
-   - Check Node.js version (should be 18+)
-   - Ensure all dependencies are in package.json
-   - Check build logs for specific errors
+   - This is a Node.js/Vite compatibility issue
+   - Solution: Use Node.js 18 and `--legacy-peer-deps` flag
+   - See `NETLIFY_TROUBLESHOOTING.md` for detailed fixes
 
-2. **API calls fail:**
+2. **Build fails on Netlify:**
+
+   - Check Node.js version (should be 18)
+   - Use build command: `npm ci --legacy-peer-deps && npm run build`
+   - Ensure publish directory is `frontend/dist`
+
+3. **API calls fail:**
 
    - Verify VITE_API_URL is correct
    - Check CORS settings in backend
    - Ensure backend is deployed and accessible
 
-3. **Environment variables not working:**
+4. **Environment variables not working:**
    - Prefix frontend variables with `VITE_`
    - Restart/redeploy after changing variables
    - Check variable names for typos
