@@ -20,7 +20,7 @@ from slowapi.util import get_remote_address
 
 from backend.settings import settings
 from backend.scoring import analyze_wallet
-from backend.alith_agent import create_agent, get_trustlens_agent, is_agent_healthy, validate_wallet_address
+from backend.alith_agent import AgentManager, WalletValidator
 
 # --- Logging Setup ---
 logging.basicConfig(level=logging.INFO)
@@ -49,7 +49,7 @@ async def verify_api_key(api_key: str = Depends(api_key_header)):
 
 # --- Global Variables ---
 redis_client: redis.Redis | None = None
-trustlens_agent = None
+agent_manager: Optional[AgentManager] = None
 
 # --- Caching Functions ---
 async def get_cache_key(address: str, blockchain: str) -> str:
@@ -95,13 +95,11 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Redis connection failed, running without cache. Error: {e}")
         redis_client = None
     
-    # Initialize TrustLens AI Agent
+    # Initialize TrustLens AI Agent Manager
     if settings.enable_ai_analysis:
-        trustlens_agent = create_agent()
-        if trustlens_agent:
-            logger.info("TrustLens AI Agent initialized successfully")
-        else:
-            logger.warning("TrustLens AI Agent initialization failed. Check API keys.")
+        agent_manager = AgentManager()
+        # The agent is created lazily on first request, so we just log manager readiness.
+        logger.info("TrustLens AI AgentManager initialized and ready.")
     else:
         logger.info("AI analysis is disabled by configuration.")
     
@@ -112,7 +110,10 @@ async def lifespan(app: FastAPI):
     if redis_client:
         await redis_client.close()
         logger.info("Redis connection closed.")
-    trustlens_agent = None
+    if agent_manager:
+        await agent_manager.shutdown()
+        logger.info("AgentManager shut down successfully.")
+    agent_manager = None
 
 app = FastAPI(
     title="TrustLens.AI API",
@@ -154,7 +155,7 @@ class WalletAnalysisRequest(BaseModel):
 
     @validator('address')
     def validate_address_format(cls, v):
-        if not v or not validate_wallet_address(v.strip()):
+        if not v or not WalletValidator.validate_wallet_address(v.strip()):
             raise ValueError("Invalid wallet address format")
         return v.strip().lower() if v.startswith('0x') else v.strip()
 
@@ -229,16 +230,15 @@ async def health_check(request: Request):
     except ImportError:
         pass
     
-    ai_agent_available = trustlens_agent is not None
-    gemini_configured = bool(settings.gemini_api_key)
-    etherscan_configured = bool(settings.etherscan_api_key)
-    
+    agent_health = agent_manager.get_agent_status() if agent_manager else {"status": "disabled"}
+
     all_systems_healthy = all([
         redis_connected,
         scoring_available,
-        etherscan_configured
+        settings.etherscan_api_key,
+        agent_health.get('status') != 'degraded'
     ])
-    
+
     return HealthResponse(
         status="healthy" if all_systems_healthy else "degraded",
         timestamp=datetime.now(timezone.utc),
@@ -248,10 +248,8 @@ async def health_check(request: Request):
         checks={
             "redis": redis_connected,
             "scoring_module": scoring_available,
-            "ai_agent": ai_agent_available,
-            "gemini_api": gemini_configured,
-            "etherscan_api": etherscan_configured,
-            "ai_analysis_enabled": settings.enable_ai_analysis,
+            "etherscan_api_configured": bool(settings.etherscan_api_key),
+            "agent_status": agent_health
         }
     )
 
@@ -281,10 +279,14 @@ async def analyze_wallet_v2(
         analysis = full_analysis['analysis']
         
         ai_insights = None
-        if wallet_request.include_ai_insights and settings.enable_ai_analysis and trustlens_agent:
+        if wallet_request.include_ai_insights and agent_manager:
             try:
                 ai_prompt = f"Provide additional insights for wallet {wallet_request.address} with trust score {analysis['score']} and risk level {analysis.get('risk_level', 'unknown')}. Focus on what this means for users."
-                ai_insights = await asyncio.wait_for(trustlens_agent.run_async(ai_prompt), timeout=10)
+                agent = agent_manager.get_agent()
+                if agent:
+                    ai_insights = await asyncio.wait_for(agent.prompt(ai_prompt), timeout=10)
+                else:
+                    ai_insights = "AI agent is currently unavailable."
             except Exception as e:
                 logger.warning(f"AI insights failed: {e}")
                 ai_insights = "AI insights temporarily unavailable."
@@ -327,8 +329,9 @@ async def chat_with_ai(
 ):
     """Chat with TrustLens AI for wallet analysis and crypto insights"""
     start_time = time.time()
-    
-    if not settings.enable_ai_analysis or not trustlens_agent:
+    conversation_id = chat_request.conversation_id or f"chat_{int(time.time() * 1000)}"
+
+    if not agent_manager:
         # Provide helpful fallback response instead of error
         processing_time = round((time.time() - start_time) * 1000, 2)
         fallback_response = """🤖 Hello! I'm the TrustLens AI agent, but I'm currently running in limited mode.
@@ -351,14 +354,19 @@ async def chat_with_ai(
             processing_time_ms=processing_time
         )
     
-    conversation_id = chat_request.conversation_id or f"chat_{int(time.time() * 1000)}"
-    
     logger.info(f"AI chat request received - Message: {chat_request.message[:50]}... - Conversation ID: {conversation_id}")
     
     try:
-        # Use the correct agent method based on available methods
+        agent = agent_manager.get_agent()
+        if not agent:
+            logger.error("AI agent is not available. All models failed to initialize.")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="The AI agent is currently unavailable. Please try again later."
+            )
+
         ai_response = await asyncio.wait_for(
-            trustlens_agent.prompt(chat_request.message),
+            agent.prompt(chat_request.message),
             timeout=float(settings.request_timeout)
         )
         
