@@ -264,6 +264,22 @@ class ChatResponse(BaseModel):
     response: str = Field(..., description="AI agent response")
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
+class TransactionSimulationRequest(BaseModel):
+    """Transaction simulation request"""
+    from_address: str = Field(..., description="Sender wallet address")
+    to_address: str = Field(..., description="Recipient address")
+    amount_eth: float = Field(..., gt=0, description="Transaction amount in ETH")
+    transaction_type: str = Field(default="transfer", description="Type of transaction")
+
+class TransactionSimulationResponse(BaseModel):
+    """Transaction simulation response"""
+    risk_score: int = Field(..., ge=0, le=100)
+    risk_level: str
+    warnings: List[str]
+    recommendations: List[str]
+    estimated_loss_probability: float
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # Dependency functions
 async def get_redis() -> Optional[redis.Redis]:
     """Get Redis client dependency"""
