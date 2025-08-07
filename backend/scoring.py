@@ -524,7 +524,7 @@ class TrustScoreCalculator:
             
         return factors
 
-async def analyze_wallet(address: str, api_key: Optional[str] = None) -> Dict[str, Any]:
+async def analyze_wallet(address: str, api_key: Optional[str] = None, include_ai_features: bool = True) -> Dict[str, Any]:
     """
     Main entry point for wallet analysis.
     Initializes dependencies and returns the full analysis result.
@@ -541,6 +541,46 @@ async def analyze_wallet(address: str, api_key: Optional[str] = None) -> Dict[st
 
     calculator = TrustScoreCalculator()
     score_result = calculator.calculate_trust_score(metrics)
+    
+    # Add AI-powered features if requested
+    if include_ai_features:
+        try:
+            from ai_features import ExplainableAI, BehavioralClustering
+            
+            # Add explainable risk factors
+            explainable_ai = ExplainableAI()
+            explainable_risks = await explainable_ai.analyze_explainable_risks(metrics)
+            score_result['explainable_risks'] = [
+                {
+                    'factor_type': risk.factor_type,
+                    'severity': risk.severity,
+                    'confidence': risk.confidence,
+                    'title': risk.title,
+                    'explanation': risk.explanation,
+                    'evidence': risk.evidence,
+                    'recommendation': risk.recommendation,
+                    'impact_score': risk.impact_score
+                }
+                for risk in explainable_risks
+            ]
+            
+            # Add behavioral clustering
+            behavioral_clustering = BehavioralClustering()
+            clusters = await behavioral_clustering.classify_behavior(metrics)
+            score_result['behavioral_clusters'] = [
+                {
+                    'cluster_type': cluster.cluster_type,
+                    'similarity_score': cluster.similarity_score,
+                    'description': cluster.description,
+                    'typical_behaviors': cluster.typical_behaviors,
+                    'risk_indicators': cluster.risk_indicators
+                }
+                for cluster in clusters
+            ]
+            
+        except Exception as e:
+            logger.error(f"AI features error: {str(e)}")
+            score_result['ai_features_error'] = str(e)
     
     return score_result
 

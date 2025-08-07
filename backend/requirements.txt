@@ -27,3 +27,6 @@ pandas>=2.0.0
 
 # AI Agent Framework
 alith
+
+# Google Gemini AI
+google-generativeai>=0.3.0
