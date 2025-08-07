@@ -800,8 +800,37 @@ async def chat_with_ai(
                 response_text = f"❌ Sorry, I couldn't analyze {wallet_address}. Error: {str(e)}"
         
         else:
+            # Check if this is a follow-up question about previous analysis
+            if any(word in message for word in ['why', 'explain', 'how', 'what does', 'tell me more', 'details']):
+                try:
+                    from ai_features import GeminiAIIntegration
+                    gemini_api_key = os.getenv("GEMINI_API_KEY")
+                    
+                    if gemini_api_key:
+                        gemini_ai = GeminiAIIntegration(gemini_api_key)
+                        # For now, provide a general response since we don't have context storage
+                        response_text = await gemini_ai.answer_followup_question(
+                            message, 
+                            {"context": "General blockchain wallet analysis question"}
+                        )
+                    else:
+                        response_text = """🤖 <b>AI Assistant Unavailable</b>
+                        
+I'd love to provide detailed explanations, but the AI assistant requires a Gemini API key to be configured.
+
+For now, I can help you with:
+• Wallet address analysis
+• Basic risk assessment
+• Transaction pattern analysis
+
+Try asking me to analyze a specific wallet address!"""
+                        
+                except Exception as e:
+                    logger.error(f"Gemini AI error: {str(e)}")
+                    response_text = f"Sorry, I couldn't process your question. Please try analyzing a wallet address instead."
+            
             # No wallet address found, provide general help
-            if any(word in message for word in ['help', 'how', 'what', 'guide']):
+            elif any(word in message for word in ['help', 'how', 'what', 'guide']):
                 response_text = """🔍 <b>TrustLens AI Agent Help</b>
 
 I can analyze Ethereum wallet addresses and ENS domains to provide trust scores and risk assessments.
@@ -865,6 +894,85 @@ You can also ask for "help" to learn more about what I can do!"""
         logger.error("Chat request failed", error=str(e))
         return ChatResponse(
             response="❌ Sorry, I encountered an error processing your request. Please try again."
+        )
+
+@app.post("/api/v2/simulate-transaction", response_model=TransactionSimulationResponse, tags=["AI Features"])
+@limiter.limit(settings.rate_limit)
+async def simulate_transaction(
+    request: Request,
+    sim_request: TransactionSimulationRequest,
+    authenticated: bool = Depends(verify_api_key)
+):
+    """Simulate transaction risk assessment"""
+    start_time = time.time()
+    
+    try:
+        from ai_features import TransactionSimulator
+        from scoring import analyze_wallet
+        
+        # Analyze the sender wallet first
+        api_key = os.getenv("ETHERSCAN_API_KEY")
+        sender_analysis = await asyncio.wait_for(
+            analyze_wallet(sim_request.from_address, api_key, include_ai_features=False),
+            timeout=settings.request_timeout
+        )
+        
+        # Extract wallet metrics
+        sender_metrics_data = sender_analysis.get('raw_metrics', {})
+        
+        # Create a simplified WalletMetrics object for simulation
+        from scoring import WalletMetrics
+        sender_metrics = WalletMetrics(
+            address=sim_request.from_address,
+            current_balance=sender_metrics_data.get('current_balance', 0),
+            total_transactions=sender_metrics_data.get('total_transactions', 0),
+            wallet_age=sender_metrics_data.get('wallet_age', 0),
+            average_transaction_value=sender_metrics_data.get('average_transaction_value', 0),
+            max_transaction_value=sender_metrics_data.get('max_transaction_value', 0),
+            unique_counterparties=sender_metrics_data.get('unique_counterparties', 0),
+            gas_efficiency_score=sender_metrics_data.get('gas_efficiency_score', 50),
+            activity_frequency=sender_metrics_data.get('activity_frequency', 0),
+            last_activity_days=sender_metrics_data.get('last_activity_days', 999),
+            incoming_volume=sender_metrics_data.get('incoming_volume', 0),
+            outgoing_volume=sender_metrics_data.get('outgoing_volume', 0),
+            net_flow=sender_metrics_data.get('net_flow', 0),
+            contract_interactions=sender_metrics_data.get('contract_interactions', 0),
+            failed_transactions=sender_metrics_data.get('failed_transactions', 0),
+            data_source=sender_metrics_data.get('data_source', 'unknown')
+        )
+        
+        # Perform transaction simulation
+        simulator = TransactionSimulator()
+        risk_assessment = await simulator.assess_transaction_risk(
+            sender_metrics,
+            sim_request.to_address,
+            sim_request.amount_eth,
+            sim_request.transaction_type
+        )
+        
+        processing_time = round((time.time() - start_time) * 1000, 2)
+        
+        logger.info(
+            "Transaction simulation completed",
+            from_address=sim_request.from_address,
+            to_address=sim_request.to_address,
+            risk_score=risk_assessment.risk_score,
+            processing_time_ms=processing_time
+        )
+        
+        return TransactionSimulationResponse(
+            risk_score=risk_assessment.risk_score,
+            risk_level=risk_assessment.risk_level,
+            warnings=risk_assessment.warnings,
+            recommendations=risk_assessment.recommendations,
+            estimated_loss_probability=risk_assessment.estimated_loss_probability
+        )
+        
+    except Exception as e:
+        logger.error("Transaction simulation failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Simulation failed: {str(e)}"
         )
 
 @app.get("/metrics", tags=["System"])
