@@ -456,7 +456,7 @@ async def analyze_wallet_v2(
         # Use asyncio.wait_for to enforce a timeout on the analysis
         api_key = os.getenv("ETHERSCAN_API_KEY")
         full_analysis = await asyncio.wait_for(
-            analyze_wallet(wallet_request.address, api_key),
+            analyze_wallet(wallet_request.address, api_key, include_ai_features=True),
             timeout=settings.request_timeout
         )
         # analyze_wallet returns the analysis directly
@@ -616,8 +616,9 @@ async def chat_with_ai(
                 
                 # Use asyncio.wait_for to enforce timeout
                 api_key = os.getenv("ETHERSCAN_API_KEY")
+                gemini_api_key = os.getenv("GEMINI_API_KEY")
                 full_analysis = await asyncio.wait_for(
-                    analyze_wallet(wallet_address, api_key),
+                    analyze_wallet(wallet_address, api_key, include_ai_features=True),
                     timeout=settings.request_timeout
                 )
                 
@@ -662,6 +663,15 @@ async def chat_with_ai(
                     f"",
                     f"📊 <b>WALLET METRICS</b>"
                 ]
+                
+                # Add AI-powered behavioral clustering
+                behavioral_clusters = analysis.get('behavioral_clusters', [])
+                if behavioral_clusters:
+                    response_parts.append(f"")
+                    response_parts.append(f"🧠 <b>AI BEHAVIORAL ANALYSIS</b>")
+                    for cluster in behavioral_clusters[:2]:  # Show top 2 clusters
+                        response_parts.append(f"   🎯 <b>{cluster['cluster_type'].replace('_', ' ').title()}:</b> {cluster['description']}")
+                        response_parts.append(f"      Similarity: {cluster['similarity_score']*100:.0f}%")
                 
                 # Add wallet metrics in organized sections
                 if raw_metrics:
@@ -731,9 +741,20 @@ async def chat_with_ai(
                         bar = "█" * (score // 10) + "░" * (10 - score // 10)
                         response_parts.append(f"   {label}: <b>{score:2d}/100</b> [{bar}]")
                 
-                # Risk factors with better formatting
-                risk_factors = analysis.get('risk_factors', [])
-                if risk_factors:
+                # Enhanced explainable risk factors
+                explainable_risks = analysis.get('explainable_risks', [])
+                if explainable_risks:
+                    response_parts.append(f"")
+                    response_parts.append(f"🔍 <b>EXPLAINABLE RISK ANALYSIS</b>")
+                    for i, risk in enumerate(explainable_risks[:2], 1):  # Show top 2 risks
+                        severity_emoji = {"low": "🟢", "medium": "🟡", "high": "🟠", "critical": "🔴"}.get(risk['severity'], "⚪")
+                        response_parts.append(f"   <b>{i}. {risk['title']}</b> {severity_emoji}")
+                        response_parts.append(f"      {risk['explanation'][:100]}...")
+                        response_parts.append(f"      <i>Recommendation: {risk['recommendation'][:80]}...</i>")
+                
+                # Fallback to basic risk factors if no explainable risks
+                elif analysis.get('risk_factors', []):
+                    risk_factors = analysis.get('risk_factors', [])
                     response_parts.append(f"")
                     response_parts.append(f"⚠️ <b>RISK FACTORS</b>")
                     for i, factor in enumerate(risk_factors[:3], 1):  # Limit to top 3
