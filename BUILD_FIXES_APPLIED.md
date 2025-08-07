@@ -1,8 +1,13 @@
 # 🔧 Build Fixes Applied for Netlify Deployment
 
-## Issue Resolved: `crypto.hash is not a function`
+## Issues Resolved: Multiple Build Errors
 
-The build was failing due to a Node.js/Vite compatibility issue. Here are all the fixes I've applied:
+The build was failing due to several issues:
+1. `crypto.hash is not a function` - Node.js/Vite compatibility
+2. `npm ci` package-lock sync errors - Outdated lock file
+3. Engine compatibility warnings - Dependencies requiring Node 20+
+
+Here are all the fixes I've applied:
 
 ## ✅ Configuration Changes Made
 
@@ -11,10 +16,10 @@ The build was failing due to a Node.js/Vite compatibility issue. Here are all th
 [build]
   base = "frontend/"
   publish = "dist/"  # Fixed: was "frontend/dist/"
-  command = "npm ci --legacy-peer-deps && npm run build"
+  command = "rm -f package-lock.json && npm install --legacy-peer-deps && npm run build"
 
 [build.environment]
-  NODE_VERSION = "18"  # Changed from 20 to 18 for stability
+  NODE_VERSION = "20"  # Updated to 20 for Vite 7 and React Router 7 compatibility
   NODE_OPTIONS = "--max-old-space-size=4096"
   NODE_ENV = "production"
   NPM_CONFIG_PRODUCTION = "false"
@@ -38,8 +43,12 @@ export default defineConfig({
 - Added `build:clean` script for troubleshooting
 
 ### 4. **Node.js Version Files**
-- Created `.nvmrc` with Node 18
-- Updated build scripts to use Node 18
+- Created `.nvmrc` with Node 20
+- Updated build scripts to use Node 20
+
+### 5. **Package Lock File**
+- Removed outdated `package-lock.json` to force regeneration
+- Changed from `npm ci` to `npm install` to handle sync issues
 
 ## 🚀 How to Deploy Now
 
@@ -79,7 +88,7 @@ If you need to manually configure in Netlify dashboard:
 
 **Environment Variables:**
 ```
-NODE_VERSION=18
+NODE_VERSION=20
 NODE_OPTIONS=--max-old-space-size=4096
 NODE_ENV=production
 NPM_CONFIG_PRODUCTION=false
@@ -88,10 +97,12 @@ NPM_CONFIG_PRODUCTION=false
 ## 🔍 What These Fixes Do
 
 1. **`--legacy-peer-deps`**: Resolves dependency conflicts in newer npm versions
-2. **Node 18**: More stable than Node 20 for Vite builds
+2. **Node 20**: Required for Vite 7 and React Router 7 compatibility
 3. **Terser minifier**: More compatible than esbuild for complex builds
 4. **ES2020 target**: Better browser compatibility than esnext
 5. **Memory increase**: Prevents out-of-memory errors during build
+6. **Package lock removal**: Forces regeneration with correct dependencies
+7. **npm install vs npm ci**: Handles package-lock sync issues automatically
 
 ## ✅ Expected Result
 

@@ -1,17 +1,27 @@
 # 🔧 Netlify Deployment Troubleshooting
 
-## Issue: `crypto.hash is not a function` Build Error
+## Issues: Build Errors on Netlify
 
-This error occurs due to Node.js version compatibility issues with Vite 7.x. Here are the solutions:
+### Issue 1: `crypto.hash is not a function`
+This error occurs due to Node.js version compatibility issues with Vite 7.x.
+
+### Issue 2: `npm ci` package-lock sync errors
+This happens when dependencies are added but package-lock.json isn't updated.
+
+### Issue 3: Engine compatibility warnings
+React Router 7 and Vite 7 require Node.js 20+.
+
+Here are the solutions:
 
 ### ✅ Solution 1: Updated Configuration (Applied)
 
 I've updated your configuration with these fixes:
 
-1. **Node.js Version**: Changed to Node 18 for better stability
+1. **Node.js Version**: Changed to Node 20 for compatibility with Vite 7 and React Router 7
 2. **Vite Config**: Updated build target and minifier
 3. **Package.json**: Added terser dependency
-4. **Build Command**: Added `--legacy-peer-deps` flag
+4. **Build Command**: Uses `npm install` instead of `npm ci` to handle lock file sync
+5. **Package Lock**: Removed outdated package-lock.json to force regeneration
 
 ### 🚀 Quick Fix Commands
 
@@ -40,12 +50,12 @@ If the current config doesn't work, try these build settings in Netlify dashboar
 
 **Build Settings:**
 - **Base directory:** `frontend`
-- **Build command:** `npm ci --legacy-peer-deps && npm run build`
+- **Build command:** `rm -f package-lock.json && npm install --legacy-peer-deps && npm run build`
 - **Publish directory:** `frontend/dist`
 
 **Environment Variables:**
 ```
-NODE_VERSION=18
+NODE_VERSION=20
 NODE_OPTIONS=--max-old-space-size=4096
 NODE_ENV=production
 NPM_CONFIG_PRODUCTION=false

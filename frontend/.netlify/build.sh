@@ -10,9 +10,15 @@ export NODE_OPTIONS="--max-old-space-size=4096"
 # Clear npm cache to avoid issues
 npm cache clean --force
 
-# Install dependencies
+# Remove existing lock file if it exists (to avoid sync issues)
+if [ -f "package-lock.json" ]; then
+    echo "🗑️ Removing outdated package-lock.json..."
+    rm package-lock.json
+fi
+
+# Install dependencies with legacy peer deps
 echo "📦 Installing dependencies..."
-npm ci
+npm install --legacy-peer-deps
 
 # Build the project
 echo "🔨 Building project..."

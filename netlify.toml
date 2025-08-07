@@ -5,12 +5,12 @@
   # Directory that contains the deploy-ready HTML files and assets
   publish = "dist/"
   
-  # Build command with error handling
-  command = "npm ci --legacy-peer-deps && npm run build"
+  # Build command that handles dependency sync issues
+  command = "rm -f package-lock.json && npm install --legacy-peer-deps && npm run build"
 
 [build.environment]
-  # Node.js version - using 18 for better stability
-  NODE_VERSION = "18"
+  # Node.js version - using 20 for compatibility with Vite 7 and React Router 7
+  NODE_VERSION = "20"
   # Node options for better memory management
   NODE_OPTIONS = "--max-old-space-size=4096"
   # Environment settings
