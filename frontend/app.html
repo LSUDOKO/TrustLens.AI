@@ -5,6 +5,26 @@
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>TrustLens.AI - On-Chain Wallet Trust & Risk Analysis</title>
+    <script>
+        // Configuration for TrustLens.AI Frontend
+        window.TrustLensConfig = {
+            // API URL - will be set via environment variables in production
+            API_URL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+                ? 'http://127.0.0.1:8000' 
+                : 'https://your-backend-url.com', // Replace this with your actual backend URL
+            
+            // Environment detection
+            ENVIRONMENT: window.location.hostname === 'localhost' ? 'development' : 'production',
+            
+            // Debug mode
+            DEBUG: window.location.hostname === 'localhost'
+        };
+
+        // Log configuration in development
+        if (window.TrustLensConfig.DEBUG) {
+            console.log('TrustLens Config:', window.TrustLensConfig);
+        }
+    </script>
     <style>
         * {
             margin: 0;
@@ -1045,7 +1065,7 @@
 
             try {
                 // Call real API
-                const response = await fetch('http://127.0.0.1:8000/api/v2/analyze', {
+                const response = await fetch(`${window.TrustLensConfig.API_URL}/api/v2/analyze`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1473,7 +1493,7 @@
             simulateButton.disabled = true;
             
             try {
-                const response = await fetch('http://127.0.0.1:8000/api/v2/simulate-transaction', {
+                const response = await fetch(`${window.TrustLensConfig.API_URL}/api/v2/simulate-transaction`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1573,7 +1593,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                const response = await fetch('http://127.0.0.1:8000/api/v2/chat', {
+                const response = await fetch(`${window.TrustLensConfig.API_URL}/api/v2/chat`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -19,6 +20,7 @@ class Settings:
         self.request_timeout = int(os.getenv("REQUEST_TIMEOUT", "30"))
         self.api_key = os.getenv("API_KEY", "").strip()
         self.cache_ttl = int(os.getenv("CACHE_TTL", "3600")) # Cache for 1 hour by default
+        self.frontend_origins = os.getenv("FRONTEND_ORIGINS", "")
 
 # Create a single, global instance of the settings
 settings = Settings()
