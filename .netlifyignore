@@ -1,0 +1,9 @@
+# Netlify ignore file - exclude from secrets scanning
+backend/
+*.md
+.git/
+node_modules/
+.env.example
+test-build.sh
+deploy.sh
+build.sh

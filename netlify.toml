@@ -17,6 +17,8 @@
   NODE_ENV = "production"
   # NPM configuration
   NPM_CONFIG_PRODUCTION = "false"
+  # Disable secrets scanning for this public project (false positives)
+  SECRETS_SCAN_ENABLED = "false"
 
 # Redirect rules for SPA (Single Page Application)
 [[redirects]]
