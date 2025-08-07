@@ -11,6 +11,8 @@ class Settings:
     def __init__(self):
         self.gemini_api_key = os.getenv("GEMINI_API_KEY")
         self.etherscan_api_key = os.getenv("ETHERSCAN_API_KEY")
+        self.google_cloud_project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
+        self.google_cloud_location = os.getenv("GOOGLE_CLOUD_LOCATION")
         self.enable_ai_analysis = os.getenv("ENABLE_AI_ANALYSIS", "true").lower() == "true"
         self.redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         self.environment = os.getenv("ENVIRONMENT", "development")

@@ -96,56 +96,32 @@ async def get_wallet_analysis_tool(wallet_address: str) -> str:
 
 @lru_cache(maxsize=1)
 def create_agent() -> Optional[Agent]:
-    """Initialize the Alith Agent with caching to prevent multiple instances"""
-    if not settings.gemini_api_key:
-        logger.warning("⚠️ GEMINI_API_KEY not found. Alith Agent is disabled.")
-        logger.info("💡 To enable AI chat, add GEMINI_API_KEY to your .env file")
+    """Creates and configures the Alith AI agent."""
+    if not all([
+        settings.gemini_api_key,
+        settings.google_cloud_project_id,
+        settings.google_cloud_location
+    ]):
+        logger.warning("Gemini API key, Google Cloud Project ID, or Location is not set. AI agent will not be created.")
         return None
-    if not settings.etherscan_api_key:
-        logger.warning("⚠️ ETHERSCAN_API_KEY not found. Wallet analysis will be limited.")
-    
+
     try:
-        # Debug: Check what's available in the Agent class
-        logger.info("Attempting to create Alith Agent...")
+        location = settings.google_cloud_location
+        project_id = settings.google_cloud_project_id
+        base_url = f"https://{location}-aiplatform.googleapis.com/v1/projects/{project_id}/locations/{location}"
+
+        logger.info(f"Attempting to create agent with model: gemini-pro and base_url: {base_url}")
         
-        # Try to import and inspect Alith to understand supported models
-        from alith import Agent
-        logger.info(f"Alith Agent class available: {Agent}")
-        
-        # Initialize Agent with correct model name for Alith
-        # Based on Alith documentation, try common model names
-        model_names_to_try = [
-            "deepseek-chat",
-            "gpt-4", 
-            "gpt-3.5-turbo",
-            "claude-3-sonnet",
-            "gemini-pro",
-            "gemini"
-        ]
-        
-        agent = None
-        for model_name in model_names_to_try:
-            try:
-                logger.info(f"Trying model: {model_name}")
-                agent = Agent(
-                    model=model_name,
-                    tools=[get_wallet_analysis_tool],
-                    api_key=settings.gemini_api_key,
-                )
-                logger.info(f"✅ Successfully created agent with model: {model_name}")
-                break
-            except Exception as model_error:
-                logger.warning(f"Failed with model {model_name}: {model_error}")
-                continue
-        
-        if not agent:
-            raise Exception("Failed to create agent with any supported model")
-        
-        logger.info("✅ TrustLens AI Agent (Gemini-powered) initialized successfully.")
+        agent = Agent(
+            model="gemini-pro",
+            tools=[get_wallet_analysis_tool],
+            api_key=settings.gemini_api_key,
+            base_url=base_url,
+        )
+        logger.info("Agent created successfully with model: gemini-pro")
         return agent
-        
     except Exception as e:
-        logger.error(f"Failed to initialize Alith Agent: {e}")
+        logger.error(f"Failed to create agent with Gemini: {e}")
         return None
 
 # Singleton pattern for agent instance
