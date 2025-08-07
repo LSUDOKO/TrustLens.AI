@@ -68,7 +68,9 @@ class Settings:
         
     def _parse_origins(self) -> List[str]:
         origins = os.getenv("FRONTEND_ORIGINS", "http://localhost:5173,http://localhost:3000")
-        return [origin.strip() for origin in origins.split(",")]
+        parsed_origins = [origin.strip() for origin in origins.split(",")]
+        print(f"DEBUG: Loaded CORS origins: {parsed_origins}")
+        return parsed_origins
     
     def _parse_hosts(self) -> List[str]:
         hosts = os.getenv("TRUSTED_HOSTS", "localhost,127.0.0.1")
@@ -252,6 +254,15 @@ class ErrorResponse(BaseModel):
     message: str
     timestamp: datetime
     request_id: Optional[str] = None
+
+class ChatRequest(BaseModel):
+    """Chat request model"""
+    message: str = Field(..., min_length=1, max_length=1000, description="User message")
+
+class ChatResponse(BaseModel):
+    """Chat response model"""
+    response: str = Field(..., description="AI agent response")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # Dependency functions
 async def get_redis() -> Optional[redis.Redis]:
@@ -443,17 +454,19 @@ async def analyze_wallet_v2(
         logger.info("Performing new analysis", address=wallet_request.address)
 
         # Use asyncio.wait_for to enforce a timeout on the analysis
+        api_key = os.getenv("ETHERSCAN_API_KEY")
         full_analysis = await asyncio.wait_for(
-            analyze_wallet(wallet_request.address),
+            analyze_wallet(wallet_request.address, api_key),
             timeout=settings.request_timeout
         )
-        analysis = full_analysis['analysis']
+        # analyze_wallet returns the analysis directly
+        analysis = full_analysis
         processing_time = round((time.time() - start_time) * 1000, 2)
 
         response_data = WalletAnalysisResponse(
             address=wallet_request.address,
             blockchain=wallet_request.blockchain,
-            trust_score=analysis['score'],
+            trust_score=analysis['trust_score'],
             risk_level=analysis['risk_level'].value if hasattr(analysis['risk_level'], 'value') else analysis['risk_level'],
             risk_factors=[RiskFactor(**rf) for rf in analysis['risk_factors']],
             explanation=analysis['explanation'],
@@ -474,7 +487,7 @@ async def analyze_wallet_v2(
         logger.info(
             "Wallet analysis completed",
             address=wallet_request.address,
-            trust_score=analysis["score"],
+            trust_score=analysis["trust_score"],
             processing_time_ms=processing_time
         )
 
@@ -557,6 +570,265 @@ async def health_check(request: Request):
             "database": True,  # Add actual DB check if needed
         }
     )
+
+@app.post("/api/v2/chat", response_model=ChatResponse, tags=["AI Agent"])
+@limiter.limit(settings.rate_limit)
+async def chat_with_ai(
+    request: Request,
+    chat_request: ChatRequest,
+    authenticated: bool = Depends(verify_api_key)
+):
+    """AI chat endpoint for wallet analysis queries"""
+    start_time = time.time()
+    
+    logger.info(
+        "Received chat request",
+        message=chat_request.message[:100] + "..." if len(chat_request.message) > 100 else chat_request.message
+    )
+    
+    try:
+        # Simple pattern matching for wallet analysis
+        message = chat_request.message.lower().strip()
+        
+        # Extract wallet address from message
+        import re
+        
+        # Look for Ethereum addresses (0x followed by 40 hex characters)
+        eth_pattern = r'0x[a-fA-F0-9]{40}'
+        eth_matches = re.findall(eth_pattern, chat_request.message)
+        
+        # Look for ENS domains
+        ens_pattern = r'\b\w+\.eth\b'
+        ens_matches = re.findall(ens_pattern, chat_request.message)
+        
+        wallet_address = None
+        if eth_matches:
+            wallet_address = eth_matches[0]
+        elif ens_matches:
+            wallet_address = ens_matches[0]
+        
+        if wallet_address:
+            # Perform wallet analysis
+            try:
+                from scoring import analyze_wallet
+                
+                logger.info("Analyzing wallet for chat", address=wallet_address)
+                
+                # Use asyncio.wait_for to enforce timeout
+                api_key = os.getenv("ETHERSCAN_API_KEY")
+                full_analysis = await asyncio.wait_for(
+                    analyze_wallet(wallet_address, api_key),
+                    timeout=settings.request_timeout
+                )
+                
+                # analyze_wallet returns the analysis directly
+                analysis = full_analysis
+                raw_metrics = full_analysis.get('raw_metrics', {})
+                
+                # Debug logging
+                logger.info(f"Chat analysis result: trust_score={analysis.get('trust_score', 'NOT_FOUND')}, risk_level={analysis.get('risk_level', 'NOT_FOUND')}")
+                
+                # Generate natural language response
+                trust_score = analysis.get('trust_score', 0)
+                risk_level = analysis.get('risk_level', 'unknown')
+                if hasattr(risk_level, 'value'):
+                    risk_level = risk_level.value
+                
+                # Format response based on trust score
+                if trust_score >= 80:
+                    trust_desc = "highly trustworthy"
+                    emoji = "✅"
+                elif trust_score >= 60:
+                    trust_desc = "moderately trustworthy"
+                    emoji = "⚠️"
+                elif trust_score >= 40:
+                    trust_desc = "somewhat risky"
+                    emoji = "🔶"
+                else:
+                    trust_desc = "high risk"
+                    emoji = "🚨"
+                
+                # Build organized response with HTML formatting
+                response_parts = [
+                    f"{emoji} <b>WALLET ANALYSIS REPORT</b>",
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+                    f"",
+                    f"📍 <b>Address:</b> {wallet_address}",
+                    f"",
+                    f"🎯 <b>TRUST ASSESSMENT</b>",
+                    f"   • <b>Score:</b> {trust_score}/100",
+                    f"   • <b>Rating:</b> {trust_desc.title()}",
+                    f"   • <b>Risk Level:</b> {risk_level.replace('_', ' ').title()}",
+                    f"",
+                    f"📊 <b>WALLET METRICS</b>"
+                ]
+                
+                # Add wallet metrics in organized sections
+                if raw_metrics:
+                    # Basic Info
+                    if raw_metrics.get('current_balance') is not None:
+                        balance = raw_metrics['current_balance']
+                        response_parts.append(f"   💰 <b>Balance:</b> {balance:.4f} ETH (${balance * 2500:.0f} USD)")
+                    
+                    if raw_metrics.get('wallet_age'):
+                        age_days = raw_metrics['wallet_age']
+                        if age_days >= 365:
+                            age_str = f"{age_days // 365} year(s), {age_days % 365} days"
+                        else:
+                            age_str = f"{age_days} days"
+                        response_parts.append(f"   ⏰ <b>Age:</b> {age_str}")
+                    
+                    # Activity Metrics
+                    response_parts.append(f"")
+                    response_parts.append(f"📈 <b>ACTIVITY ANALYSIS</b>")
+                    
+                    if raw_metrics.get('total_transactions'):
+                        response_parts.append(f"   🔄 <b>Total Transactions:</b> {raw_metrics['total_transactions']:,}")
+                    
+                    if raw_metrics.get('unique_counterparties'):
+                        response_parts.append(f"   👥 <b>Unique Counterparties:</b> {raw_metrics['unique_counterparties']:,}")
+                    
+                    if raw_metrics.get('last_activity_days') is not None:
+                        last_activity = raw_metrics['last_activity_days']
+                        if last_activity == 0:
+                            activity_str = "Today"
+                        elif last_activity == 1:
+                            activity_str = "Yesterday"
+                        else:
+                            activity_str = f"{last_activity} days ago"
+                        response_parts.append(f"   📅 <b>Last Activity:</b> {activity_str}")
+                    
+                    # Transaction Patterns
+                    if raw_metrics.get('average_transaction_value') or raw_metrics.get('contract_interactions'):
+                        response_parts.append(f"")
+                        response_parts.append(f"🔍 <b>TRANSACTION PATTERNS</b>")
+                        
+                        if raw_metrics.get('average_transaction_value'):
+                            avg_value = raw_metrics['average_transaction_value']
+                            response_parts.append(f"   💸 <b>Average Transaction:</b> {avg_value:.4f} ETH")
+                        
+                        if raw_metrics.get('contract_interactions'):
+                            contracts = raw_metrics['contract_interactions']
+                            total_tx = raw_metrics.get('total_transactions', 1)
+                            contract_pct = (contracts / total_tx) * 100
+                            response_parts.append(f"   🤖 <b>Smart Contract Usage:</b> {contracts:,} transactions ({contract_pct:.1f}%)")
+                
+                # Component Scores
+                component_scores = analysis.get('component_scores', {})
+                if component_scores:
+                    response_parts.append(f"")
+                    response_parts.append(f"⚡ <b>DETAILED SCORES</b>")
+                    score_items = [
+                        ('balance', '💰 Balance', component_scores.get('balance', 0)),
+                        ('activity', '📈 Activity', component_scores.get('activity', 0)),
+                        ('age', '⏰ Age', component_scores.get('age', 0)),
+                        ('transactions', '🔄 Transactions', component_scores.get('transactions', 0)),
+                        ('network', '🌐 Network', component_scores.get('network', 0)),
+                        ('risk', '🛡️ Risk Factors', component_scores.get('risk', 0))
+                    ]
+                    
+                    for key, label, score in score_items:
+                        bar = "█" * (score // 10) + "░" * (10 - score // 10)
+                        response_parts.append(f"   {label}: <b>{score:2d}/100</b> [{bar}]")
+                
+                # Risk factors with better formatting
+                risk_factors = analysis.get('risk_factors', [])
+                if risk_factors:
+                    response_parts.append(f"")
+                    response_parts.append(f"⚠️ <b>RISK FACTORS</b>")
+                    for i, factor in enumerate(risk_factors[:3], 1):  # Limit to top 3
+                        if isinstance(factor, dict):
+                            factor_text = factor.get('description', 'Unknown risk factor')
+                        else:
+                            factor_text = str(factor)
+                        response_parts.append(f"   <b>{i}.</b> {factor_text}")
+                
+                # Data source with better formatting
+                data_source = raw_metrics.get('data_source', 'unknown')
+                response_parts.append(f"")
+                response_parts.append(f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                if data_source == 'simulated':
+                    response_parts.append("⚠️ <i>This analysis uses simulated data for demonstration purposes.</i>")
+                elif data_source == 'real':
+                    response_parts.append("✅ <i>Analysis powered by real blockchain data from Etherscan API</i>")
+                else:
+                    response_parts.append(f"ℹ️ <i>Data source: {data_source}</i>")
+                
+                response_text = "\n".join(response_parts)
+                
+            except asyncio.TimeoutError:
+                response_text = f"⏱️ Analysis of {wallet_address} timed out. Please try again later."
+            except Exception as e:
+                logger.error("Chat wallet analysis failed", error=str(e), address=wallet_address)
+                response_text = f"❌ Sorry, I couldn't analyze {wallet_address}. Error: {str(e)}"
+        
+        else:
+            # No wallet address found, provide general help
+            if any(word in message for word in ['help', 'how', 'what', 'guide']):
+                response_text = """🔍 <b>TrustLens AI Agent Help</b>
+
+I can analyze Ethereum wallet addresses and ENS domains to provide trust scores and risk assessments.
+
+<b>How to use:</b>
+• Send me a wallet address like: 0x1234...abcd
+• Or an ENS domain like: vitalik.eth
+• Ask me to "analyze [address]" or just paste the address
+
+<b>What I analyze:</b>
+• Trust score (0-100)
+• Risk level assessment
+• Transaction patterns
+• Wallet age and activity
+• Security indicators
+
+<b>Example queries:</b>
+• "analyze 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+• "what's the trust score for vitalik.eth?"
+• "check this wallet: 0x1234..."
+
+Try sending me a wallet address to get started! 🚀"""
+            
+            elif any(word in message for word in ['hello', 'hi', 'hey', 'start']):
+                response_text = """👋 Hello! I'm the TrustLens AI agent.
+
+I can analyze any Ethereum wallet address or ENS name to provide:
+• <b>Trust scores and risk assessments</b>
+• <b>Transaction pattern analysis</b>
+• <b>Security insights</b>
+• <b>Wallet activity metrics</b>
+
+Just send me a wallet address (0x...) or ENS domain (.eth) and I'll analyze it for you!
+
+Need help? Just ask "help" or "how to use"."""
+            
+            else:
+                response_text = """🤔 I didn't find a wallet address in your message.
+
+To analyze a wallet, please provide:
+• <b>An Ethereum address</b> (starts with 0x, 42 characters)
+• <b>An ENS domain</b> (ends with .eth)
+
+<b>Examples:</b>
+• 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+• vitalik.eth
+
+You can also ask for "help" to learn more about what I can do!"""
+        
+        processing_time = round((time.time() - start_time) * 1000, 2)
+        
+        logger.info(
+            "Chat request completed",
+            processing_time_ms=processing_time,
+            response_length=len(response_text)
+        )
+        
+        return ChatResponse(response=response_text)
+        
+    except Exception as e:
+        logger.error("Chat request failed", error=str(e))
+        return ChatResponse(
+            response="❌ Sorry, I encountered an error processing your request. Please try again."
+        )
 
 @app.get("/metrics", tags=["System"])
 async def get_metrics():

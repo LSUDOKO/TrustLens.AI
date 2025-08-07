@@ -1341,9 +1341,27 @@
         const addMessage = (text, sender) => {
             const messageElement = document.createElement('div');
             messageElement.classList.add('message', `${sender}-message`);
-            // Sanitize text before adding to prevent XSS
+            
             const p = document.createElement('p');
-            p.textContent = text;
+            
+            // For bot messages, allow basic HTML formatting (bold, italic)
+            if (sender === 'bot') {
+                // Simple sanitization - only allow safe HTML tags
+                const sanitizedText = text
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/&lt;b&gt;/g, '<b>')
+                    .replace(/&lt;\/b&gt;/g, '</b>')
+                    .replace(/&lt;i&gt;/g, '<i>')
+                    .replace(/&lt;\/i&gt;/g, '</i>')
+                    .replace(/\n/g, '<br>');
+                
+                p.innerHTML = sanitizedText;
+            } else {
+                // For user messages, use plain text
+                p.textContent = text;
+            }
+            
             messageElement.appendChild(p);
             chatMessages.appendChild(messageElement);
             chatMessages.scrollTop = chatMessages.scrollHeight; // Auto-scroll to bottom
@@ -1365,14 +1383,10 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
 
             try {
-                const apiKey = window.API_KEY || ''; // Will be injected during build or from a secure source
-                console.log(`--- Sending API key from frontend: ${apiKey ? apiKey.substring(0, 4) + '...' : 'No API key'} ---`);
-
                 const response = await fetch('http://127.0.0.1:8000/api/v2/chat', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-KEY': apiKey
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ message: query }),
                 });
